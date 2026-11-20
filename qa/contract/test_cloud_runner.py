@@ -70,10 +70,29 @@ def test_gen_isolation():
     assert len(cr.state["live"]) == 1, "current-generation emit was dropped"
 
 
+def test_fix_crash_releases_lock():
+    # a crash inside fix() must clear state["fixing"], or no further attack is ever accepted
+    cr.state["gen"] = 7
+    cr.state["fixing"] = True
+    cr.fix = _boom  # type: ignore  # force a failure in the blue phase
+    try:
+        cr.run_fix(7)
+    finally:
+        cr.fix = _real_fix  # type: ignore
+    assert cr.state["fixing"] is False, "a crashed fix left the runner wedged (DoS)"
+
+
 if __name__ == "__main__":
+    _real_fix = cr.fix
+
+    def _boom(_gen):
+        raise RuntimeError("blue phase blew up")
+
     test_merge_gate()
     test_scrub()
     test_gen_isolation()
+    test_fix_crash_releases_lock()
     print("PASS  merge-gate (no forged approval, exact reviewer set, no request_changes)")
     print("PASS  event-scrub (jwt, diff secret, cookie, env secret + base64, secret-keyed fields)")
     print("PASS  gen-isolation (stale-run events cannot reach the gate)")
+    print("PASS  fix-crash releases the lock (no DoS wedge)")

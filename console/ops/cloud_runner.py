@@ -150,9 +150,20 @@ def fix(gen):
     emit({"type": "tests", "passed": passed, "total": passed + failed, "regression_added": 1}, gen)
     with lock:
         first = next((e["ts"] for e in current(state["live"], gen) if e["type"] == "red_finding"), time.time())
-        if gen == state["gen"]:
-            state["fixing"] = False
     emit({"type": "metrics", "minutes_exploit_to_fix": max(1, round((time.time() - first) / 60)), "regression_tests": passed + failed, "where": WHERE}, gen)
+
+
+def run_fix(gen):
+    """Run fix() and always release the fix lock, so a crash cannot wedge the runner (no further
+    attack would be accepted). A failure is shown as an event, never hidden."""
+    try:
+        fix(gen)
+    except Exception as e:  # noqa: BLE001
+        emit({"type": "harness_error", "detail": f"fix failed: {type(e).__name__}"}, gen)
+    finally:
+        with lock:
+            if gen == state["gen"]:
+                state["fixing"] = False
 
 
 def recorded():
@@ -182,30 +193,34 @@ def radar(gen):
 
 
 def harness(started, gen):
-    radar(gen)
-    run_dir = RUNS / time.strftime("%Y%m%d-%H%M%S")
-    proc = subprocess.run(
-        ["python", "-m", "neo.harness.runner", "run", "--scenario", SCENARIO, "--agent", "swarm", "--run-dir", str(run_dir)],
-        cwd=ENGINE, capture_output=True, text=True, timeout=600)
     events = []
     try:
-        report = json.loads((run_dir / "report.json").read_text())
-        metrics = json.loads((run_dir / "metrics.json").read_text())
-        now = time.time()
-        for i, f in enumerate(report.get("findings", [])):
-            events.append({"type": "red_finding", "ts": round(now + i * 0.1, 3), "finding_id": f"F-{i + 1:03d}", "model": "model-1",
-                           "cls": f.get("class", ""), "location": f.get("location", ""), "request": f.get("evidence", ""),
-                           "response": str(report.get("chain", ""))[:600], "confirmed_by": "model-3", "origin": "cloud", "gen": gen})
-        events.append({"type": "flag_check", "ts": round(now + 1, 3), "finding_id": "F-001", "scenario": metrics.get("scenario", SCENARIO),
-                       "phase": "pre-patch", "objective_complete": bool(metrics.get("objective_complete")),
-                       "evidence": [json.dumps(e) for e in metrics.get("evidence", [])][:4], "origin": "cloud", "gen": gen})
-    except (OSError, ValueError):
-        sys.stderr.write((proc.stderr or "")[-2000:])
-        events.append({"type": "harness_error", "ts": round(time.time(), 3), "detail": f"harness exited {proc.returncode}", "origin": "cloud", "gen": gen})
-    with lock:
-        if gen == state["gen"]:
-            state["live"] += events
-            state["running"] = False
+        radar(gen)
+        run_dir = RUNS / time.strftime("%Y%m%d-%H%M%S")
+        proc = subprocess.run(
+            ["python", "-m", "neo.harness.runner", "run", "--scenario", SCENARIO, "--agent", "swarm", "--run-dir", str(run_dir)],
+            cwd=ENGINE, capture_output=True, text=True, timeout=600)
+        try:
+            report = json.loads((run_dir / "report.json").read_text())
+            metrics = json.loads((run_dir / "metrics.json").read_text())
+            now = time.time()
+            for i, f in enumerate(report.get("findings", [])):
+                events.append({"type": "red_finding", "ts": round(now + i * 0.1, 3), "finding_id": f"F-{i + 1:03d}", "model": "model-1",
+                               "cls": f.get("class", ""), "location": f.get("location", ""), "request": f.get("evidence", ""),
+                               "response": str(report.get("chain", ""))[:600], "confirmed_by": "model-3", "origin": "cloud", "gen": gen})
+            events.append({"type": "flag_check", "ts": round(now + 1, 3), "finding_id": "F-001", "scenario": metrics.get("scenario", SCENARIO),
+                           "phase": "pre-patch", "objective_complete": bool(metrics.get("objective_complete")),
+                           "evidence": [json.dumps(e) for e in metrics.get("evidence", [])][:4], "origin": "cloud", "gen": gen})
+        except (OSError, ValueError):
+            sys.stderr.write((proc.stderr or "")[-2000:])
+            events.append({"type": "harness_error", "ts": round(time.time(), 3), "detail": f"harness exited {proc.returncode}", "origin": "cloud", "gen": gen})
+    except Exception as e:  # noqa: BLE001 - the red phase crashed; show it, never wedge the runner
+        events.append({"type": "harness_error", "ts": round(time.time(), 3), "detail": f"attack failed: {type(e).__name__}", "origin": "cloud", "gen": gen})
+    finally:
+        with lock:
+            if gen == state["gen"]:
+                state["live"] += events
+                state["running"] = False
 
 
 def attack():
@@ -271,7 +286,7 @@ class Handler(BaseHTTPRequestHandler):
                     state["fixing"] = True
             if not ready:
                 return self._send(409, {"error": "fix needs a proven finding (pre-patch flag check objective_complete=true)"})
-            threading.Thread(target=fix, args=(gen,), daemon=True).start()
+            threading.Thread(target=run_fix, args=(gen,), daemon=True).start()
         elif action == "approve":
             with lock:
                 gen = state["gen"]
