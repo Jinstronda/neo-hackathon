@@ -26,6 +26,11 @@ SCENARIO = os.environ.get("NEO_SCENARIO", "sql-injection")
 SECRET = os.environ.get("NEO_EVE_SECRET", "")
 WHERE = os.environ.get("NEO_WHERE", "server")
 FIXTURE = Path(__file__).with_name("fixture-run.json")
+# Real PR route: when this box has a clean checkout and a token, fix() opens a genuine PR against
+# the repo; otherwise it opens none and the console shows no PR link (never a dead one).
+PR_REPO = os.environ.get("NEO_PR_REPO", "Jinstronda/neo-hackathon")
+PR_BASE = os.environ.get("NEO_PR_BASE", "master")
+PR_WORKDIR = os.environ.get("NEO_PR_WORKDIR", "")
 RED = {"radar_match", "twin_create", "red_start", "red_finding", "flag_check"}
 lock = threading.Lock()
 # gen is the run generation. It rises on each attack and stamps every event, so a late emit from
@@ -104,6 +109,23 @@ def emit(event, gen=None):
         state["live"].append(dict(event, ts=round(time.time(), 3), origin="cloud", gen=state["gen"]))
 
 
+def open_real_pr(finding, diff):
+    """Open a genuine GitHub PR for the patch and return its {number, url, branch, ...}, or None
+    when this box has no PR checkout or token so the console shows no PR link (never a dead one).
+    A per-run finding_id keeps each run's branch unique."""
+    tok = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not (PR_WORKDIR and tok and Path(PR_WORKDIR, ".git").is_dir()):
+        return None
+    from neo import factory
+    fid = finding.get("finding_id", "F-001")
+    ff = dict(finding, finding_id=f"{fid}-{int(time.time())}", scenario=SCENARIO)
+    try:
+        return factory.open_pr(ff, diff, repo=PR_REPO, workdir=PR_WORKDIR, base=PR_BASE)
+    except Exception as e:  # noqa: BLE001 - a PR that cannot open must not fake one or wedge the fix
+        sys.stderr.write((f"open_real_pr failed: {type(e).__name__}: {e}\n").replace(tok, "[redacted]"))
+        return None
+
+
 def fix(gen):
     """Blue phase on the box: the engine's documented fix for the scenario, its two-vendor
     review, the same reference exploit replayed on the patched copy, then its test suite. Every
@@ -120,22 +142,27 @@ def fix(gen):
     patched = original.replace(before, after, 1)
     (work / "demo-target/app.py").write_text(patched)
     diff = "".join(difflib.unified_diff(original.splitlines(True), patched.splitlines(True), "a/demo-target/app.py", "b/demo-target/app.py", n=1))
-    digest = hashlib.sha256(diff.encode()).hexdigest()
-    pr_number = 1 + int(digest[:6], 16) % 90  # stable per patch, so the demo shows the same PR each run
-    pr_url = f"https://github.com/neo/demo-target/pull/{pr_number}"
     with lock:
         finding = next((e for e in state["live"] if e["type"] == "red_finding"), {})
-        state["pr"] = pr_number  # the merge event, emitted in the approve handler, reads this
-    emit({"type": "blue_patch", "finding_id": finding.get("finding_id", "F-001"), "pr_number": pr_number, "pr_url": pr_url,
-          "branch": f"fix/{SCENARIO}", "diff": diff,
-          "commits": [{"msg": f"fix: {label.split(' ', 1)[1]} per FIXES.md", "kind": "fix"}]}, gen)
-    pr = {"finding": dict(finding, scenario=SCENARIO), "diff": diff, "digest": digest}
+    real = open_real_pr(finding, diff)  # real PR dict, or None when no checkout/token on this box
+    with lock:
+        state["pr"] = real  # the merge event, emitted in the approve handler, reads this
+    blue = {"type": "blue_patch", "finding_id": finding.get("finding_id", "F-001"),
+            "branch": (real or {}).get("branch", f"fix/{SCENARIO}"), "diff": diff,
+            "commits": [{"msg": f"fix: {label.split(' ', 1)[1]} (reference patch from FIXES.md)", "kind": "fix"}]}
+    if real:
+        blue["pr_number"], blue["pr_url"] = real["number"], real["url"]
+    emit(blue, gen)
+    review_pr = {"finding": dict(finding, scenario=SCENARIO), "diff": diff, "digest": hashlib.sha256(diff.encode()).hexdigest()}
     def review(role):
         try:
-            v = reviewers.review_one(role, pr)
-            emit({"type": "review", "pr_number": pr_number, "reviewer": role, "vendor": v["vendor"], "verdict": v["verdict"], "comment": v["comment"], "rechecked": True}, gen)
+            v = reviewers.review_one(role, review_pr)
+            ev = {"type": "review", "reviewer": role, "vendor": v["vendor"], "verdict": v["verdict"], "comment": v["comment"], "rechecked": True}
         except Exception as e:  # noqa: BLE001 - a failed review is shown, never hidden
-            emit({"type": "review", "pr_number": pr_number, "reviewer": role, "verdict": "request_changes", "comment": f"review failed: {type(e).__name__}", "rechecked": False}, gen)
+            ev = {"type": "review", "reviewer": role, "verdict": "request_changes", "comment": f"review failed: {type(e).__name__}", "rechecked": False}
+        if real:
+            ev["pr_number"] = real["number"]
+        emit(ev, gen)
     threads = [threading.Thread(target=review, args=(r,)) for r in ("security", "correctness")]
     [t.start() for t in threads]
     twin = f"twin-{int(time.time()) % 100000}"
@@ -152,12 +179,12 @@ def fix(gen):
     out = subprocess.run(["python", "-m", "pytest", "tests", "-q", "-p", "no:cacheprovider"], cwd=ENGINE, capture_output=True, text=True, timeout=600).stdout
     passed = int((re.search(r"(\d+) passed", out) or [0, 0])[1])
     failed = int((re.search(r"(\d+) failed", out) or [0, 0])[1])
-    emit({"type": "tests", "passed": passed, "total": passed + failed, "regression_added": 1}, gen)
+    emit({"type": "tests", "passed": passed, "total": passed + failed}, gen)
     with lock:
         first = next((e["ts"] for e in current(state["live"], gen) if e["type"] == "red_finding"), time.time())
-    rm = recorded()[0]["run"].get("metrics", {})  # the demo target's surface figures, one source of truth
+    # Only figures measured in this run. Cost and attack-surface need a real engine measurement we
+    # do not have here, so they are omitted (the console hides the cards) rather than faked.
     emit({"type": "metrics", "minutes_exploit_to_fix": max(1, round((time.time() - first) / 60)),
-          "cost_usd": rm.get("cost_usd"), "tested_surface": rm.get("tested_surface"), "untested_surface": rm.get("untested_surface"),
           "regression_tests": passed + failed, "where": WHERE}, gen)
 
 
@@ -215,7 +242,7 @@ def harness(started, gen):
             for i, f in enumerate(report.get("findings", [])):
                 events.append({"type": "red_finding", "ts": round(now + i * 0.1, 3), "finding_id": f"F-{i + 1:03d}", "model": "model-1",
                                "cls": f.get("class", ""), "location": f.get("location", ""), "request": f.get("evidence", ""),
-                               "response": str(report.get("chain", ""))[:600], "confirmed_by": "model-3", "origin": "cloud", "gen": gen})
+                               "response": str(report.get("chain", ""))[:600], "confirmed_by": "server-side flag check", "origin": "cloud", "gen": gen})
             events.append({"type": "flag_check", "ts": round(now + 1, 3), "finding_id": "F-001", "scenario": metrics.get("scenario", SCENARIO),
                            "phase": "pre-patch", "objective_complete": bool(metrics.get("objective_complete")),
                            "evidence": [json.dumps(e) for e in metrics.get("evidence", [])][:4], "origin": "cloud", "gen": gen})
@@ -303,8 +330,11 @@ class Handler(BaseHTTPRequestHandler):
             if not ok:
                 return self._send(409, {"error": "approve needs a proven exploit, a green retest and two approving reviews"})
             with lock:
-                pr_number = state.get("pr")
-            emit({"type": "merge", "pr_number": pr_number, "by": "human", "approved_by": approvers}, gen)
+                real = state.get("pr")
+            merge = {"type": "merge", "by": "human", "approved_by": approvers}
+            if real:
+                merge["pr_number"], merge["pr_url"] = real["number"], real["url"]
+            emit(merge, gen)
         self._send(200, {"ok": True, "action": action, "scenario": SCENARIO})
 
     def log_message(self, *args):

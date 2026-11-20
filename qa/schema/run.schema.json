@@ -46,7 +46,7 @@
         },
         "metrics": {
           "type": "object",
-          "required": ["minutes_exploit_to_fix", "cost_usd", "where", "tested_surface", "untested_surface", "regression_tests"],
+          "required": ["minutes_exploit_to_fix", "where", "regression_tests"],
           "properties": {
             "minutes_exploit_to_fix": { "type": "number", "minimum": 0 },
             "cost_usd": { "type": "number", "minimum": 0 },
@@ -77,13 +77,13 @@
         { "if": { "properties": { "type": { "const": "red_start" } } }, "then": { "required": ["twin_id", "models"], "properties": { "models": { "type": "array", "minItems": 1 } } } },
         { "if": { "properties": { "type": { "const": "red_finding" } } }, "then": { "required": ["finding_id", "model", "cls", "location", "request", "response", "confirmed_by"] } },
         { "if": { "properties": { "type": { "const": "flag_check" } } }, "then": { "required": ["finding_id", "scenario", "phase", "objective_complete", "evidence"], "properties": { "phase": { "enum": ["pre-patch", "post-patch"] }, "objective_complete": { "type": "boolean" } } } },
-        { "if": { "properties": { "type": { "const": "blue_patch" } } }, "then": { "required": ["finding_id", "pr_url", "pr_number", "branch", "diff", "commits"] } },
-        { "if": { "properties": { "type": { "const": "review" } } }, "then": { "required": ["pr_number", "reviewer", "vendor", "verdict", "comment", "rechecked"], "properties": { "reviewer": { "enum": ["security", "correctness"] }, "verdict": { "enum": ["approve", "request_changes"] }, "rechecked": { "const": true } } } },
+        { "if": { "properties": { "type": { "const": "blue_patch" } } }, "then": { "required": ["finding_id", "branch", "diff", "commits"] } },
+        { "if": { "properties": { "type": { "const": "review" } } }, "then": { "required": ["reviewer", "vendor", "verdict", "comment", "rechecked"], "properties": { "reviewer": { "enum": ["security", "correctness"] }, "verdict": { "enum": ["approve", "request_changes"] }, "rechecked": { "const": true } } } },
         { "if": { "properties": { "type": { "const": "twin_deploy" } } }, "then": { "required": ["twin_id", "where", "image", "finding_id"] } },
         { "if": { "properties": { "type": { "const": "retest" } } }, "then": { "required": ["finding_id", "scenario", "objective_complete", "status"], "properties": { "status": { "enum": ["green", "red"] } } } },
-        { "if": { "properties": { "type": { "const": "tests" } } }, "then": { "required": ["passed", "total", "regression_added"] } },
-        { "if": { "properties": { "type": { "const": "merge" } } }, "then": { "required": ["pr_number", "by", "approved_by"], "properties": { "by": { "const": "human" } } } },
-        { "if": { "properties": { "type": { "const": "metrics" } } }, "then": { "required": ["minutes_exploit_to_fix", "cost_usd", "where", "tested_surface", "untested_surface", "regression_tests"] } }
+        { "if": { "properties": { "type": { "const": "tests" } } }, "then": { "required": ["passed", "total"] } },
+        { "if": { "properties": { "type": { "const": "merge" } } }, "then": { "required": ["by", "approved_by"], "properties": { "by": { "const": "human" } } } },
+        { "if": { "properties": { "type": { "const": "metrics" } } }, "then": { "required": ["minutes_exploit_to_fix", "where", "regression_tests"] } }
       ]
     }
   }

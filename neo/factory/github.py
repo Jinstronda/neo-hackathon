@@ -1,7 +1,20 @@
-"""Real PR route: branch, apply the patch, commit, push, `gh pr create`. Uses the
-repo's own git identity. No force push, no merge: a human merges."""
+"""Real PR route: branch, apply the patch, commit, push over an authenticated remote, then
+open the PR through the GitHub REST API. The runner box has no `gh` CLI, so this uses git plus
+stdlib urllib and a token (GH_TOKEN/GITHUB_TOKEN). Commits use the clone's own git identity,
+set when the clone is created. No force push, no merge: a human merges."""
 import json
+import os
 import subprocess
+import urllib.request
+
+API = "https://api.github.com"
+
+
+def _token():
+    tok = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not tok:
+        raise RuntimeError("GH_TOKEN/GITHUB_TOKEN not set for the real PR route")
+    return tok
 
 
 def _run(cmd, cwd, stdin=None):
@@ -11,20 +24,29 @@ def _run(cmd, cwd, stdin=None):
     return out.stdout.strip()
 
 
+def _api(method, path, token, payload=None):
+    body = json.dumps(payload).encode() if payload is not None else None
+    req = urllib.request.Request(f"{API}{path}", data=body, method=method, headers={
+        "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "neo-factory"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode())
+
+
 def open_pr(workdir, repo, base, branch, diff, title, body, commit_msg):
-    _run(["git", "fetch", "origin", base], workdir)
-    _run(["git", "checkout", "-b", branch, f"origin/{base}"], workdir)
-    _run(["git", "apply", "--index", "-"], workdir, stdin=diff)
+    token = _token()
+    remote = f"https://x-access-token:{token}@github.com/{repo}.git"
+    _run(["git", "fetch", remote, base], workdir)
+    _run(["git", "checkout", "-B", branch, "FETCH_HEAD"], workdir)
+    _run(["git", "apply", "--index", "--recount", "-"], workdir, stdin=diff)
     _run(["git", "commit", "-m", commit_msg], workdir)
-    _run(["git", "push", "-u", "origin", branch], workdir)
-    url = _run(["gh", "pr", "create", "--repo", repo, "--base", base, "--head", branch,
-                "--title", title, "--body-file", "-"], workdir, stdin=body)
-    return url, int(url.rstrip("/").rsplit("/", 1)[1])
+    _run(["git", "push", remote, f"HEAD:refs/heads/{branch}"], workdir)
+    pr = _api("POST", f"/repos/{repo}/pulls", token,
+              {"title": title, "head": branch, "base": base, "body": body})
+    return pr["html_url"], int(pr["number"])
 
 
 def merged(repo, number):
     """True only if GitHub says the PR is merged. Who merged is checked by the caller."""
-    out = _run(["gh", "pr", "view", str(number), "--repo", repo, "--json",
-                "state,mergedBy"], None)
-    d = json.loads(out)
-    return d.get("state") == "MERGED", (d.get("mergedBy") or {}).get("login")
+    d = _api("GET", f"/repos/{repo}/pulls/{number}", _token())
+    return bool(d.get("merged")), (d.get("merged_by") or {}).get("login")

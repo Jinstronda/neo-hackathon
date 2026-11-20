@@ -27,13 +27,15 @@ UI_READS = {
     "red_start": ["twin_id", "models"],
     "red_finding": ["finding_id", "model", "cls", "location", "request", "confirmed_by"],
     "flag_check": ["finding_id", "scenario", "phase", "objective_complete", "evidence"],
-    "blue_patch": ["finding_id", "pr_number", "branch", "diff", "commits"],
-    "review": ["pr_number", "reviewer", "verdict", "comment"],
+    "blue_patch": ["finding_id", "branch", "diff", "commits"],
+    "review": ["reviewer", "verdict", "comment"],
     "twin_deploy": ["twin_id", "where", "finding_id"],
     "retest": ["finding_id", "objective_complete", "status"],
-    "tests": ["passed", "total", "regression_added"],
-    "merge": ["pr_number", "by", "approved_by"],
-    "metrics": ["minutes_exploit_to_fix", "cost_usd", "where", "tested_surface", "untested_surface", "regression_tests"],
+    "tests": ["passed", "total"],
+    "merge": ["by", "approved_by"],
+    "metrics": ["minutes_exploit_to_fix", "where", "regression_tests"],
+    # pr_number/pr_url (only when a real PR opened), regression_added, cost_usd and the surface
+    # counts are optional: sent only when measured, and every renderer hides them when absent
 }
 
 
