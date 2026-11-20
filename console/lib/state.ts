@@ -69,7 +69,7 @@ export function view(run: RunSummary, events: RunEvent[]): View {
       if (pre && mine.length) trace.push({ ts: pre.ts, label: 'Server flag check confirmed it', tone: 'red' });
       status = mine.length ? 'done' : started ? (pre ? 'done' : 'working') : 'idle';
     } else if (agent.role === 'blue') {
-      sub = 'frontier coder';
+      sub = 'blue team';
       if (patch) trace.push({ ts: patch.ts, label: patch.pr_number ? `Opened PR #${text(patch.pr_number)} (${text(patch.branch)})` : `Patched ${text(patch.branch)}` });
       if (rebuiltPost) trace.push({ ts: rebuiltPost.ts, label: `Rebuilt ${text(rebuiltPost.twin_id)}` });
       if (post && postDead) trace.push({ ts: post.ts, label: 'Replayed the exploit: objective not reached', tone: 'green' });
