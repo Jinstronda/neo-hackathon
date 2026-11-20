@@ -104,12 +104,18 @@ button, input, textarea { font: inherit; color: inherit; }
 /* incident */
 .twins { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .twin { padding: 16px; display: grid; gap: 12px; align-content: start; min-height: 220px; transition: background var(--slow) var(--ease); }
-.twin.tint-red { background: var(--red-bg); } .twin.tint-green { background: var(--green-bg); }
-.verdict { font-size: var(--t-20); font-weight: 600; letter-spacing: -.01em; }
+.twin.tint-red { background: var(--red-bg); border-color: rgba(255, 97, 102, .45); } .twin.tint-green { background: var(--green-bg); border-color: rgba(98, 192, 115, .45); }
+.twin { transition: background var(--slow) var(--ease), border-color var(--slow) var(--ease); }
+.verdict { font-size: var(--t-32); font-weight: 600; letter-spacing: -.03em; line-height: 1.1; }
 .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; font-size: var(--t-13); }
 .kv dt { color: var(--muted); } .kv dd { min-width: 0; overflow-wrap: anywhere; }
 pre.code { font-family: var(--mono); font-size: var(--t-12); line-height: 1.6; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-8); overflow: auto; max-height: 180px; white-space: pre-wrap; }
-.diff .add { color: var(--green); } .diff .del { color: var(--red); } .diff .hunk { color: var(--blue); }
+.diff { max-height: 320px; white-space: pre; padding: 8px 0; }
+.diff > div { padding: 0 12px; }
+.diff .add { background: rgba(98, 192, 115, .12); } .diff .del { background: rgba(255, 97, 102, .12); }
+.diff .add .gutter { color: var(--green); } .diff .del .gutter { color: var(--red); }
+.diff .hunk { color: var(--blue); } .diff .meta { color: #8f8f8f; }
+.gutter { display: inline-block; width: 2ch; user-select: none; }
 .split-3 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
 
 /* tables */
@@ -158,3 +164,8 @@ tbody tr:hover { background: var(--hover); }
 .login-card h1 { font-size: var(--t-20); font-weight: 600; }
 .login-card label { display: grid; gap: 6px; font-size: var(--t-13); color: var(--soft); }
 .login-card input { height: 40px; padding: 0 12px; border-radius: var(--r-8); border: 1px solid var(--line-2); background: var(--bg); color: var(--fg); }
+
+/* projector: 1920 wide rooms get larger type and brighter hairlines so a washed-out beamer keeps the structure */
+@media (min-width: 1800px) {
+  :root { --t-12: 14px; --t-13: 15px; --t-14: 16px; --t-16: 18px; --t-20: 23px; --t-24: 28px; --t-32: 40px; --t-48: 60px; --line: #333; --line-2: #3d3d3d; }
+}

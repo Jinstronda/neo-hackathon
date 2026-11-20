@@ -2,12 +2,9 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useRun } from './RunProvider';
 import { Timeline } from './Board';
+import { Diff } from './Diff';
 import { objectiveReached } from '@/lib/state';
 import { clock, text, type RunEvent } from '@/lib/types';
-
-function Diff({ diff }: { diff: string }) {
-  return <pre className="code diff">{diff.split('\n').map((line, i) => <div key={i} className={line.startsWith('@@') ? 'hunk' : line.startsWith('+') && !line.startsWith('+++') ? 'add' : line.startsWith('-') && !line.startsWith('---') ? 'del' : undefined}>{line || ' '}</div>)}</pre>;
-}
 
 function Twin({ title, twin, check, request }: { title: string; twin?: RunEvent; check?: RunEvent; request?: string }) {
   const reached = objectiveReached(check);
