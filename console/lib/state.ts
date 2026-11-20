@@ -79,7 +79,7 @@ export function view(run: RunSummary, events: RunEvent[]): View {
       sub = own?.vendor ? text(own.vendor) : agent.label === 'security' ? 'security reviewer' : 'correctness reviewer';
       if (own) {
         trace.push({ ts: own.ts, label: own.verdict === 'approve' ? 'Approved' : 'Requested changes', tone: own.verdict === 'approve' ? 'green' : 'red' });
-        trace.push({ ts: own.ts, label: own.rechecked === true || own.rechecked === 'True' ? 'Re-ran the exploit before posting' : text(own.comment).slice(0, 80) });
+        trace.push({ ts: own.ts, label: own.rechecked === true || own.rechecked === 'True' ? 'Re-checked the diff before posting' : text(own.comment).slice(0, 80) });
       }
       status = own ? 'done' : patch ? 'working' : 'idle';
     }
