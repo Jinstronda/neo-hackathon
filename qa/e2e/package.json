@@ -2,6 +2,14 @@
   "name": "neo-qa-e2e",
   "private": true,
   "version": "0.0.0",
-  "scripts": { "test": "playwright test" },
-  "devDependencies": { "@playwright/test": "1.60.0" }
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "axe-core": "^4.14.1"
+  }
 }
