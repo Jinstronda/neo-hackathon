@@ -25,6 +25,15 @@ RUNS = Path(os.environ.get("NEO_CLOUD_RUNS", "/runs"))
 SCENARIO = os.environ.get("NEO_SCENARIO", "sql-injection")
 SECRET = os.environ.get("NEO_EVE_SECRET", "")
 WHERE = os.environ.get("NEO_WHERE", "server")
+# Per-box PR config and secret live in a mounted file (not the image or the env-file), loaded
+# before the secrets below so the token is masked in anything we serve.
+_pr_env = Path(__file__).with_name("pr.env")
+if _pr_env.exists():
+    for _line in _pr_env.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
 FIXTURE = Path(__file__).with_name("fixture-run.json")
 # Real PR route: when this box has a clean checkout and a token, fix() opens a genuine PR against
 # the repo; otherwise it opens none and the console shows no PR link (never a dead one).
@@ -118,7 +127,9 @@ def open_real_pr(finding, diff):
         return None
     from neo import factory
     fid = finding.get("finding_id", "F-001")
-    ff = dict(finding, finding_id=f"{fid}-{int(time.time())}", scenario=SCENARIO)
+    # The PR body is built from the finding and pushed to a public repo: scrub secret shapes
+    # (JWTs, cookies, the weak demo secret) out of the exploit request/response first.
+    ff = scrub(dict(finding, finding_id=f"{fid}-{int(time.time())}", scenario=SCENARIO))
     try:
         return factory.open_pr(ff, diff, repo=PR_REPO, workdir=PR_WORKDIR, base=PR_BASE)
     except Exception as e:  # noqa: BLE001 - a PR that cannot open must not fake one or wedge the fix
