@@ -110,7 +110,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; font-size: var(--t-13); }
 .kv dt { color: var(--muted); } .kv dd { min-width: 0; overflow-wrap: anywhere; }
 pre.code { font-family: var(--mono); font-size: var(--t-12); line-height: 1.6; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-8); overflow: auto; max-height: 180px; white-space: pre-wrap; }
-.diff { max-height: 320px; white-space: pre; padding: 8px 0; }
+pre.code.diff { max-height: 360px; white-space: pre; padding: 8px 0; }
 .diff > div { padding: 0 12px; }
 .diff .add { background: rgba(98, 192, 115, .12); } .diff .del { background: rgba(255, 97, 102, .12); }
 .diff .add .gutter { color: var(--green); } .diff .del .gutter { color: var(--red); }
@@ -169,3 +169,7 @@ tbody tr:hover { background: var(--hover); }
 @media (min-width: 1800px) {
   :root { --t-12: 14px; --t-13: 15px; --t-14: 16px; --t-16: 18px; --t-20: 23px; --t-24: 28px; --t-32: 40px; --t-48: 60px; --line: #333; --line-2: #3d3d3d; }
 }
+
+.proof > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 14px 16px; border-top: 1px solid var(--line); font-size: var(--t-16); }
+.proof > div:first-child { border-top: 0; }
+@media (max-width: 720px) { .proof > div { grid-template-columns: 1fr; gap: 4px; } }
