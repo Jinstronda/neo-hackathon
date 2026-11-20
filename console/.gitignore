@@ -11,3 +11,4 @@ eve-agent/node_modules
 eve-agent/.eve
 eve-agent/.output
 ops/__pycache__
+*.tsbuildinfo
