@@ -24,9 +24,8 @@ export function sessionCookie(email: string) {
 export const clearCookie = `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 
 export async function operator(): Promise<string | null> {
-  if (!key()) return null;
   const raw = (await cookies()).get(COOKIE)?.value;
-  if (!raw) return null;
+  if (!raw || !key()) return null;
   const at = raw.lastIndexOf('.');
   const payload = raw.slice(0, at), mac = raw.slice(at + 1);
   const want = sign(payload);
