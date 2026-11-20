@@ -11,7 +11,7 @@ import pathlib
 import sys
 
 os.environ.setdefault("NEO_EVE_SECRET", "box-secret-xyz-123")
-RUNNER = pathlib.Path(__file__).resolve().parents[3] / "neo-web" / "ops" / "cloud_runner.py"
+RUNNER = pathlib.Path(__file__).resolve().parents[2] / "console" / "ops" / "cloud_runner.py"
 spec = importlib.util.spec_from_file_location("cloud_runner", RUNNER)
 cr = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cr)
@@ -19,51 +19,61 @@ spec.loader.exec_module(cr)
 PRE_TRUE = {"type": "flag_check", "phase": "pre-patch", "objective_complete": True}
 PRE_FALSE = {"type": "flag_check", "phase": "pre-patch", "objective_complete": False}
 GREEN = {"type": "retest", "status": "green", "objective_complete": False}
-REVS = [{"type": "review", "reviewer": "security", "verdict": "approve"},
-        {"type": "review", "reviewer": "correctness", "verdict": "approve"}]
+APPROVE = [{"type": "review", "reviewer": "security", "verdict": "approve"},
+           {"type": "review", "reviewer": "correctness", "verdict": "approve"}]
 
 
 def test_merge_gate():
-    # forged approval: exploit never proven -> merge refused even with green + two approvals
-    ok, _ = cr.merge_ready([PRE_FALSE, GREEN] + REVS)
-    assert ok is False, "merge allowed without a proven exploit (forged approval)"
-    # only one approver
-    ok, _ = cr.merge_ready([PRE_TRUE, GREEN, REVS[0]])
-    assert ok is False, "merge allowed with a single reviewer"
-    # retest not green
-    ok, _ = cr.merge_ready([PRE_TRUE, {"type": "retest", "status": "red", "objective_complete": True}] + REVS)
-    assert ok is False, "merge allowed with the exploit still alive"
-    # the honest path: proven + green + two approvals
-    ok, approvers = cr.merge_ready([PRE_TRUE, GREEN] + REVS)
-    assert ok is True and sorted(approvers) == ["correctness", "security"], "the legitimate merge was refused"
-    # already merged -> refused
-    ok, _ = cr.merge_ready([PRE_TRUE, GREEN] + REVS + [{"type": "merge"}])
-    assert ok is False, "a second merge was allowed"
+    # forged approval: exploit never proven -> refused even with green + both approvals
+    assert cr.merge_ready([PRE_FALSE, GREEN] + APPROVE)[0] is False, "merge allowed without a proven exploit"
+    # two approvals from the same reviewer must not count as the required set
+    assert cr.merge_ready([PRE_TRUE, GREEN, APPROVE[0], dict(APPROVE[0])])[0] is False, "duplicate reviewer counted twice"
+    # a request_changes on this attempt blocks the merge
+    assert cr.merge_ready([PRE_TRUE, GREEN] + APPROVE + [{"type": "review", "reviewer": "security", "verdict": "request_changes"}])[0] is False, "request_changes ignored"
+    # exploit still alive after the patch -> refused
+    assert cr.merge_ready([PRE_TRUE, {"type": "retest", "status": "red", "objective_complete": True}] + APPROVE)[0] is False, "merge with a live exploit"
+    # the honest path
+    ok, approvers = cr.merge_ready([PRE_TRUE, GREEN] + APPROVE)
+    assert ok is True and approvers == ["correctness", "security"], "the legitimate merge was refused"
+    # no second merge
+    assert cr.merge_ready([PRE_TRUE, GREEN] + APPROVE + [{"type": "merge"}])[0] is False, "a second merge was allowed"
 
 
 def test_scrub():
+    import base64
     jwt = "eyJhbGciOiJIUzI1NiJ9.eyJ1IjoiYWRtaW4ifQ.c2lnbmF0dXJlLWhlcmU"
     box = os.environ["NEO_EVE_SECRET"]
-    event = {
-        "type": "blue_patch",
-        "diff": 'WEAK_JWT_SECRET = "neo-demo-secret"\nAuthorization: Bearer ' + jwt,
-        "request": "GET /u?token=" + jwt,
-        "evidence": ["cookie: session=abc123deadbeef", "plain evidence line"],
-        "note": "box secret is " + box,
-        "location": "GET /api/render?template=",  # must survive untouched
-    }
-    out = cr.scrub(event)
-    blob = str(out)
-    assert jwt not in blob, "JWT leaked"
-    assert "neo-demo-secret" not in blob, "weak secret value leaked from the diff"
-    assert box not in blob, "the box secret leaked"
-    assert "abc123deadbeef" not in blob, "cookie value leaked"
-    assert out["location"] == "GET /api/render?template=", "scrub damaged a non-secret field"
-    assert out["type"] == "blue_patch" and "plain evidence line" in blob, "scrub dropped legitimate content"
+    enc = base64.b64encode(box.encode()).decode()
+    response = cr.scrub({
+        "run": {"metrics": {"cost_usd": 1}},
+        "events": [
+            {"type": "blue_patch", "diff": 'WEAK_JWT_SECRET = "neo-demo-secret"\nAuthorization: Bearer ' + jwt},
+            {"type": "red_finding", "request": "Cookie: a=1; sid=deadbeefsecret; b=2", "response": "tok " + jwt,
+             "location": "GET /api/render?template="},
+            {"type": "note", "authorization": "Bearer abc", "blob": "env " + box + " b64 " + enc},
+        ],
+        "source": "engine",
+    })
+    blob = str(response)
+    for bad, label in [(jwt, "JWT"), ("neo-demo-secret", "weak secret from diff"), ("deadbeefsecret", "cookie value"),
+                       (box, "env secret"), (enc, "base64 of env secret"), ("Bearer abc", "value under a secret key")]:
+        assert bad not in blob, f"leaked: {label}"
+    assert response["events"][1]["location"] == "GET /api/render?template=", "scrub damaged a non-secret field"
+
+
+def test_gen_isolation():
+    cr.state["gen"] = 5
+    cr.state["live"] = []
+    cr.emit({"type": "merge"}, gen=4)   # a late emit from a previous run
+    assert cr.state["live"] == [], "stale-generation emit was not dropped"
+    cr.emit({"type": "merge"}, gen=5)
+    assert len(cr.state["live"]) == 1, "current-generation emit was dropped"
 
 
 if __name__ == "__main__":
     test_merge_gate()
     test_scrub()
-    print("PASS  merge-gate (no forged approval)")
-    print("PASS  event-scrub (no secret leaves the box)")
+    test_gen_isolation()
+    print("PASS  merge-gate (no forged approval, exact reviewer set, no request_changes)")
+    print("PASS  event-scrub (jwt, diff secret, cookie, env secret + base64, secret-keyed fields)")
+    print("PASS  gen-isolation (stale-run events cannot reach the gate)")

@@ -210,25 +210,26 @@ def harness(started, gen):
 
 def attack():
     with lock:
-        if state["running"]:
-            return
+        if state["running"] or state["fixing"]:
+            return  # do not reset a run while its red phase or fix is still in flight
         now = time.time()
+        state["gen"] += 1
+        gen = state["gen"]
         state["running"] = True
-        state["fixing"] = False
         state["live"] = [
-            {"type": "twin_create", "ts": round(now, 3), "twin_id": f"twin-{int(now) % 100000}", "where": "server", "image": f"demo-target:{SCENARIO}", "origin": "cloud"},
-            {"type": "red_start", "ts": round(now + 0.5, 3), "twin_id": f"twin-{int(now) % 100000}", "models": ["model-1", "model-2", "model-3"], "origin": "cloud"},
+            {"type": "twin_create", "ts": round(now, 3), "twin_id": f"twin-{int(now) % 100000}", "where": "server", "image": f"demo-target:{SCENARIO}", "origin": "cloud", "gen": gen},
+            {"type": "red_start", "ts": round(now + 0.5, 3), "twin_id": f"twin-{int(now) % 100000}", "models": ["model-1", "model-2", "model-3"], "origin": "cloud", "gen": gen},
         ]
-    threading.Thread(target=harness, args=(now,), daemon=True).start()
+    threading.Thread(target=harness, args=(now, gen), daemon=True).start()
 
 
 def snapshot():
     data, origin = recorded()
     with lock:
-        live = list(state["live"])
+        live = current(state["live"], state["gen"])
     if not live:
-        return {"run": data["run"], "events": [scrub(e) for e in data["events"]], "source": "recorded" if origin == "recorded" else "fixture"}
-    return {"run": data["run"], "events": [scrub(e) for e in sorted(live, key=lambda e: e["ts"])], "source": "engine"}
+        return scrub({"run": data["run"], "events": data["events"], "source": "recorded" if origin == "recorded" else "fixture"})
+    return scrub({"run": data["run"], "events": sorted(live, key=lambda e: e["ts"]), "source": "engine"})
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -264,19 +265,21 @@ class Handler(BaseHTTPRequestHandler):
             attack()
         elif action == "fix":
             with lock:
-                ready = proven(state["live"]) and not state["fixing"]
+                gen = state["gen"]
+                ready = proven(current(state["live"], gen)) and not state["fixing"] and not state["running"]
                 if ready:
                     state["fixing"] = True
             if not ready:
                 return self._send(409, {"error": "fix needs a proven finding (pre-patch flag check objective_complete=true)"})
-            threading.Thread(target=fix, daemon=True).start()
+            threading.Thread(target=fix, args=(gen,), daemon=True).start()
         elif action == "approve":
             with lock:
-                live = list(state["live"])
+                gen = state["gen"]
+                live = current(state["live"], gen)
             ok, approvers = merge_ready(live)
             if not ok:
                 return self._send(409, {"error": "approve needs a proven exploit, a green retest and two approving reviews"})
-            emit({"type": "merge", "by": "human", "approved_by": approvers})
+            emit({"type": "merge", "by": "human", "approved_by": approvers}, gen)
         self._send(200, {"ok": True, "action": action, "scenario": SCENARIO})
 
     def log_message(self, *args):
