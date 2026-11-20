@@ -25,12 +25,14 @@ test('golden path: attack, find, red, fix, retest green, numbers', async ({ page
   const data = await served(request);
   const finding = pick(data.events, 'red_finding');
   const patch = pick(data.events, 'blue_patch');
-  const retest = pick(data.events, 'retest');
-  const merge = pick(data.events, 'merge');
+  // the gate is the replay on the rebuilt twin; a real run also records the pre-patch replay (red)
+  const retest = data.events.find((e) => e.type === 'retest' && e.phase === 'post-patch') ?? pick(data.events, 'retest');
+  // the human merge gate: a merge, or merge_ready when a reviewer blocked it (the recorded run, PR #1)
+  const merge = pick(data.events, 'merge') ?? pick(data.events, 'merge_ready');
   expect(finding, 'engine served a red_finding').toBeTruthy();
   expect(patch, 'engine served a blue_patch').toBeTruthy();
   expect(retest, 'engine served a retest').toBeTruthy();
-  expect(merge, 'engine served a merge').toBeTruthy();
+  expect(merge, 'engine served the merge gate').toBeTruthy();
   const location = String(finding!.location);
   const pr = String(patch!.pr_number);
   // the retest gate: the exploit must be dead after the patch, decided server-side
