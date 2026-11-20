@@ -41,7 +41,9 @@ jobs:
           pip install pytest
 
       - name: Replay exploits on the patched twin (every objective must fail)
-        run: python -m infra.replay --phase post-patch | tee retest-events.jsonl
+        run: |
+          set -o pipefail
+          python -m infra.replay --phase post-patch | tee retest-events.jsonl
 
       - name: Upload retest events
         if: always()
