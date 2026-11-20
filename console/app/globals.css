@@ -68,9 +68,16 @@ button, input, textarea { font: inherit; color: inherit; }
 .agent:nth-last-child(-n+3) { border-bottom: 0; }
 .agent-h { display: flex; align-items: baseline; gap: 8px; }
 .agent-h b { font-weight: 500; }
-.agent-h .role { margin-left: auto; color: var(--muted); font-size: var(--t-12); }
+.agent-h .role { color: var(--muted); font-size: var(--t-12); }
 .agent p { color: var(--soft); font-size: var(--t-13); line-height: 1.45; }
 .agent.busy p { color: var(--fg); }
+.asub { color: var(--muted); font-size: var(--t-12); }
+.astate { font-size: var(--t-12); font-variant-numeric: tabular-nums; }
+.astate.idle { color: var(--line-3); } .astate.working { color: var(--fg); } .astate.done { color: var(--soft); }
+.atrace { display: grid; gap: 3px; font-size: var(--t-13); line-height: 1.4; }
+.atrace > span { color: var(--soft); }
+.agent.is-working { background: var(--hover); }
+.agent.is-idle .asub, .agent.is-idle .atrace > span { opacity: .55; }
 .shimmer-text { color: var(--fg) !important; animation: pulse 1.6s ease-in-out infinite; }
 
 /* timeline, build-log style */

@@ -1,23 +1,38 @@
 'use client';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { useRun } from './RunProvider';
 import { clock, text } from '@/lib/types';
 
 const roleName = { red: 'Attack', blue: 'Patch', reviewer: 'Review' } as const;
+const stateWord = { idle: 'Idle', working: 'Working', done: 'Done' } as const;
 
 export function Board() {
   const { view } = useRun();
   if (!view) return <div className="card"><div className="card-h">Agents</div><div style={{ padding: 16, display: 'grid', gap: 10 }}><div className="skel" /><div className="skel" style={{ width: '60%' }} /></div></div>;
   const busy = view.agents.filter((a) => a.busy).length;
+  const done = view.agents.filter((a) => a.status === 'done').length;
   return (
     <section className="card" aria-label="Agents">
-      <div className="card-h">Agents<span className="end">{busy ? `${busy} working` : `${view.agents.length} agents`}</span></div>
+      <div className="card-h">Agents<span className="end">{busy ? `${busy} working` : `${done}/${view.agents.length} done`}</span></div>
       <div className="agents">
         {view.agents.map((agent, index) => (
-          <motion.div key={agent.id} className={`agent${agent.busy ? ' busy' : ''}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.3 }}>
-            <div className="agent-h"><b>{agent.label}</b><span className="role">{roleName[agent.role]}</span></div>
-            <motion.p key={agent.activity} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={agent.busy ? 'shimmer-text' : undefined}>{agent.activity}</motion.p>
+          <motion.div key={agent.id} className={`agent is-${agent.status}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04, duration: 0.3 }}>
+            <div className="agent-h">
+              <b>{agent.label}</b>
+              <span className="role">{roleName[agent.role]}</span>
+              <span className={`astate end ${agent.status}`}>{agent.busy ? <span className="shimmer-text">Working</span> : stateWord[agent.status]}</span>
+            </div>
+            <span className="asub mono">{agent.sub}</span>
+            <div className="atrace">
+              <AnimatePresence initial={false}>
+                {agent.trace.slice(-3).map((line) => (
+                  <motion.span key={`${line.ts}-${line.label}`} layout initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className={line.tone ?? 'soft'}>{line.label}</motion.span>
+                ))}
+                {agent.busy && <motion.span key="working" layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="shimmer-text">{agent.role === 'red' ? 'Driving the target' : agent.role === 'blue' ? 'Writing the patch' : 'Re-running the exploit'}</motion.span>}
+                {!agent.trace.length && !agent.busy && <span key="idle" className="soft">Waiting</span>}
+              </AnimatePresence>
+            </div>
           </motion.div>
         ))}
       </div>
