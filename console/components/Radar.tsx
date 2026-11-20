@@ -19,7 +19,7 @@ export function Radar() {
             <motion.tr key={text(m.cve)} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
               <td className="mono">{text(m.cve)}</td>
               <td><span className="mono">{text(m.package)}</span> <span className="muted">{text(m.version)}</span></td>
-              <td className={m.kev === true || m.kev === 'True' ? 'red' : 'muted'}>{m.kev === true || m.kev === 'True' ? (m.kev_staged ? 'Listed, staged' : 'Listed') : 'No'}</td>
+              <td className={m.kev === true || m.kev === 'True' ? 'red' : 'muted'}>{m.kev === true || m.kev === 'True' ? (m.kev_staged || /staged/.test(String(m.kev_source ?? '')) ? 'Listed, staged' : 'Listed') : 'No'}</td>
               <td className={`num ${num(m.epss) >= 0.5 ? 'red' : ''}`}>{(num(m.epss) * 100).toFixed(1)}%</td>
               <td className="mono hide-sm">{text(m.osv)}</td>
               <td className={m.reachable === true || m.reachable === 'True' ? 'amber' : 'muted'}>{m.reachable === true || m.reachable === 'True' ? 'Yes' : 'No'}</td>
