@@ -29,7 +29,7 @@ export function Board({ compact }: { compact?: boolean }) {
                 {agent.trace.slice(compact ? -2 : -3).map((line) => (
                   <motion.span key={`${line.ts}-${line.label}`} layout initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className={line.tone ?? 'soft'}>{line.label}</motion.span>
                 ))}
-                {agent.busy && <motion.span key="working" layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="shimmer-text">{agent.role === 'red' ? 'Driving the target' : agent.role === 'blue' ? 'Writing the patch' : 'Re-running the exploit'}</motion.span>}
+                {agent.busy && <motion.span key="working" layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="shimmer-text">{agent.role === 'red' ? 'Driving the target' : agent.role === 'blue' ? 'Patching' : 'Reading the diff'}</motion.span>}
                 {!agent.trace.length && !agent.busy && <span key="idle" className="soft">Waiting</span>}
               </AnimatePresence>
             </div>

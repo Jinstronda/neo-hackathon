@@ -74,7 +74,7 @@ export function graph(run: RunSummary, events: RunEvent[], v: View): Graph {
   if (blue && fixer && fixer.status !== 'idle') {
     const working = fixer.status === 'working';
     add({
-      id: 'fixer', col: 3, title: blue.label, sub: patch ? text(patch.branch) : 'writing the patch', tone: 'plain', working, ts: patch?.ts ?? v.pre?.ts ?? 0, href: realPr(patch?.pr_url),
+      id: 'fixer', col: 3, title: blue.label, sub: patch ? text(patch.branch) : 'patching', tone: 'plain', working, ts: patch?.ts ?? v.pre?.ts ?? 0, href: realPr(patch?.pr_url),
       facts: facts([['branch', patch?.branch], ['PR', patch?.pr_number ? `#${text(patch.pr_number)}` : undefined], ['diff digest', text(patch?.digest).slice(0, 12)],
         ['commits', Array.isArray(patch?.commits) ? String(patch.commits.length) : undefined]]),
     });
