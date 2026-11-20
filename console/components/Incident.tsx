@@ -36,7 +36,7 @@ function Twin({ title, twin, check, request }: { title: string; twin?: RunEvent;
 export function Incident() {
   const { view } = useRun();
   if (!view) return <div className="card" style={{ padding: 16 }}><div className="skel" /></div>;
-  const [before, after] = [view.twins.find((t) => t.type === 'twin_create'), view.twins.find((t) => t.type === 'twin_deploy')];
+  const [before, after] = [view.twins.find((t) => t.type === 'twin_create') ?? view.started, view.twins.find((t) => t.type === 'twin_deploy')];
   const finding = view.findings[0];
   return (
     <>

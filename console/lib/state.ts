@@ -8,7 +8,7 @@ export type View = {
   agents: (Agent & { activity: string; busy: boolean })[];
   timeline: TimelineRow[];
   findings: Finding[];
-  pre?: RunEvent; post?: RunEvent; patch?: RunEvent; reviews: RunEvent[]; tests?: RunEvent; merge?: RunEvent;
+  pre?: RunEvent; post?: RunEvent; patch?: RunEvent; reviews: RunEvent[]; tests?: RunEvent; merge?: RunEvent; mergeReady?: RunEvent; started?: RunEvent;
   radar: RunEvent[]; twins: RunEvent[]; metrics: Partial<Metrics>; done: boolean;
 };
 
@@ -21,13 +21,15 @@ export function view(run: RunSummary, events: RunEvent[]): View {
     request: text(e.request), response: text(e.response), confirmedBy: text(e.confirmed_by), at: e.ts,
   }));
   const pre = find(events, 'flag_check', (e) => e.phase === 'pre-patch');
-  const post = find(events, 'retest') || find(events, 'flag_check', (e) => e.phase === 'post-patch');
+  // the gate: the replay on the rebuilt twin (post-patch), never the pre-patch replay
+  const post = find(events, 'retest', (e) => e.phase === 'post-patch' || (e.phase === undefined && e.status === 'green')) || find(events, 'flag_check', (e) => e.phase === 'post-patch');
   const patch = find(events, 'blue_patch');
   const reviews = events.filter((e) => e.type === 'review');
   const tests = find(events, 'tests');
   const merge = find(events, 'merge');
+  const mergeReady = find(events, 'merge_ready');
   const started = find(events, 'red_start');
-  const rebuilt = find(events, 'twin_deploy');
+  const rebuilt = find(events, 'twin_deploy', (e) => e.phase !== 'pre-patch');
   const metricsEvent = [...events].reverse().find((e) => e.type === 'metrics');
   const postDead = post ? post.objective_complete === false || post.objective_complete === 'False' || post.status === 'green' : false;
   const preWorks = pre ? pre.objective_complete === true || pre.objective_complete === 'True' : false;
@@ -46,14 +48,16 @@ export function view(run: RunSummary, events: RunEvent[]): View {
     let activity = 'Idle', busy = false;
     if (agent.role === 'red') {
       const own = [...events].reverse().find((e) => e.type === 'red_finding' && e.model === agent.label);
-      if (own) activity = `Found ${text(own.cls).toLowerCase()} at ${text(own.location)}`;
+      const mine = events.filter((e) => e.type === 'red_finding' && (e.model === agent.label || (Array.isArray(e.found_by) && e.found_by.includes(agent.label))));
+      if (mine.length > 1) activity = `Found ${mine.length}: ${mine.map((e) => text(e.cls)).join(', ')}`;
+      else if (own) activity = `Found ${text(own.cls).toLowerCase()} at ${text(own.location)}`;
       else if (started) { activity = pre ? 'Swept, no new finding' : 'Attacking the twin'; busy = !pre; }
     } else if (agent.role === 'blue') {
       if (patch) activity = patch.pr_number ? `Opened PR #${text(patch.pr_number)}` : `Patched ${text(patch.branch)}`;
       else if (pre) { activity = 'Writing the patch'; busy = true; }
     } else {
       const own = reviews.find((r) => r.reviewer === agent.label);
-      if (own) activity = `${own.verdict === 'approve' ? 'Approved' : 'Requested changes'} after re-running the exploit`;
+      if (own) activity = own.verdict === 'approve' ? 'Approved after re-running the exploit' : 'Requested changes after re-running the exploit';
       else if (patch) { activity = 'Reviewing the diff'; busy = true; }
     }
     return { ...agent, activity, busy };
@@ -64,8 +68,8 @@ export function view(run: RunSummary, events: RunEvent[]): View {
     ...(metricsEvent.lockin_before !== undefined ? { lockin_before: num(metricsEvent.lockin_before), lockin_after: num(metricsEvent.lockin_after) } : {}),
   } : {};
   return {
-    agents, timeline, findings, pre, post, patch, reviews, tests, merge,
-    radar: events.filter((e) => e.type === 'radar_match'), twins: events.filter((e) => ['twin_create', 'twin_deploy'].includes(e.type)),
+    agents, timeline, findings, pre, post, patch, reviews, tests, merge, mergeReady, started,
+    radar: events.filter((e) => e.type === 'radar_match'), twins: events.filter((e) => e.type === 'twin_create' || (e.type === 'twin_deploy' && e.phase !== 'pre-patch')),
     metrics, done: Boolean(merge || metricsEvent),
   };
 }

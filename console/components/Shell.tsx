@@ -6,11 +6,11 @@ import type { ReactNode } from 'react';
 import { useRun } from './RunProvider';
 
 const tabs = [['/', 'Overview'], ['/incident', 'Incident'], ['/radar', 'Radar'], ['/numbers', 'Numbers']] as const;
-const sourceLabel = { engine: 'Live engine', recorded: 'Recorded engine run', fixture: 'Fixture run' } as const;
+const sha = process.env.NEXT_PUBLIC_COMMIT_SHA?.slice(0, 7);
 
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { source } = useRun();
+  const { source, operator } = useRun();
   return (
     <div className="app">
       <header className="top">
@@ -21,7 +21,10 @@ export function Shell({ children }: { children: ReactNode }) {
           </Link>
           <span className="slash" aria-hidden="true">/</span>
           <span className="crumb"><span className="avatar" aria-hidden="true" />demo-target</span>
-          <div className="end">{source && <span className="where">{sourceLabel[source]} · EU</span>}</div>
+          <div className="end">
+            {source !== 'engine' && <span className="where">replay</span>}
+            {operator ? <span className="where hide-sm">{operator}</span> : <Link className="btn" href="/login">Sign in</Link>}
+          </div>
         </div>
         <nav className="tabs" aria-label="Sections">
           {tabs.map(([href, label]) => {
@@ -35,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }) {
           })}
         </nav>
       </header>
-      <main className="main">{children}</main>
+      <main className="main">{children}{sha && <footer className="foot mono">{sha}</footer>}</main>
     </div>
   );
 }

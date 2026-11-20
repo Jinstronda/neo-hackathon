@@ -4,11 +4,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { view, type View } from '@/lib/state';
 import type { Phase, Run, RunEvent, Source } from '@/lib/types';
 type Chat = ReturnType<typeof useChat>;
-interface RunContext { chat: Chat; run: Run | null; seen: RunEvent[]; view: View | null; source: Source | null; playing: Phase | null; play: (phase: Phase) => void; reset: () => void }
+interface RunContext { operator: string | null; chat: Chat; run: Run | null; seen: RunEvent[]; view: View | null; source: Source | null; playing: Phase | null; play: (phase: Phase) => void; reset: () => void }
 const Ctx = createContext<RunContext | null>(null);
 
 // Holds the events seen so far. A phase streams from /api/stream (SSE); screens derive from `seen` only.
-export function RunProvider({ children, initial }: { children: ReactNode; initial: Run | null }) {
+export function RunProvider({ children, initial, operator }: { children: ReactNode; initial: Run | null; operator: string | null }) {
   const [run, setRun] = useState<Run | null>(initial);
   const [seen, setSeen] = useState<RunEvent[]>([]);
   const [playing, setPlaying] = useState<Phase | null>(null);
@@ -39,7 +39,7 @@ export function RunProvider({ children, initial }: { children: ReactNode; initia
     handled.current = chat.data?.length ?? 0;
   }, [chat.data, play]);
   const reset = useCallback(() => { source.current?.close(); setSeen([]); setPlaying(null); }, []);
-  const value = useMemo(() => ({ chat, run, seen, playing, play, reset, source: run?.source ?? null, view: run ? view(run.run, seen) : null }), [chat, run, seen, playing, play, reset]);
+  const value = useMemo(() => ({ operator, chat, run, seen, playing, play, reset, source: run?.source ?? null, view: run ? view(run.run, seen) : null }), [operator, chat, run, seen, playing, play, reset]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
