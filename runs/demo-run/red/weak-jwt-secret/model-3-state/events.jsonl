@@ -1,0 +1,4 @@
+{"ts": 1795179038.169, "type": "startup", "detail": {"app": "SnapVault", "meta_host": "127.0.0.1", "meta_port": 52735}}
+{"ts": 1795179039.104, "type": "login_attempt", "detail": {"username": "guest"}}
+{"ts": 1795179039.106, "type": "login_success", "detail": {"username": "guest", "role": "guest", "submitted": "guest"}}
+{"ts": 1795179039.113, "type": "jwt_forged_admin", "detail": {"jti": "42b18f9d195e2c0d", "sub": "guest"}}

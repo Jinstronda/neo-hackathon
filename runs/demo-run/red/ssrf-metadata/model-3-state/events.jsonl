@@ -1,0 +1,10 @@
+{"ts": 1795178945.293, "type": "startup", "detail": {"app": "SnapVault", "meta_host": "127.0.0.1", "meta_port": 50043}}
+{"ts": 1795178956.22, "type": "avatar_fetch", "detail": {"url": "http://127.0.0.1:50043/latest/meta-data/iam/security-credentials/neo-demo-role", "host": "127.0.0.1"}}
+{"ts": 1795178956.352, "type": "internal_fetch", "detail": {"url": "/latest/meta-data/iam/security-credentials/neo-demo-role"}}
+{"ts": 1795178956.355, "type": "admin_key_used", "detail": {"key_prefix": "ASIA"}}
+{"ts": 1795178956.355, "type": "flag_read", "detail": {"via": "admin export"}}
+{"ts": 1795178956.357, "type": "login_attempt", "detail": {"username": "guest"}}
+{"ts": 1795178956.357, "type": "login_success", "detail": {"username": "guest", "role": "guest", "submitted": "guest"}}
+{"ts": 1795178956.359, "type": "jwt_forged_admin", "detail": {"jti": "18de951c2d4d47f6", "sub": "guest"}}
+{"ts": 1795178956.36, "type": "login_attempt", "detail": {"username": "admin' --"}}
+{"ts": 1795178956.361, "type": "login_success", "detail": {"username": "admin", "role": "admin", "submitted": "admin' --"}}

@@ -32,9 +32,12 @@ class Journal:
 #   red_finding   {finding_id, model, cls, location, request, response, confirmed_by}
 #   flag_check    {finding_id, scenario, phase:"pre-patch"|"post-patch", objective_complete, evidence:[...]}
 #   blue_patch    {finding_id, pr_url, pr_number, branch, diff, commits:[{msg, kind}]}
-#   review        {pr_number, reviewer:"security"|"correctness", vendor, verdict:"approve"|"request_changes", comment, rechecked:true}
-#   twin_deploy   {twin_id, where, image, finding_id}
-#   retest        {finding_id, scenario, objective_complete:false, status:"green"|"red"}
+#   review        {pr_number, reviewer:"security"|"correctness", vendor, verdict:"approve"|"request_changes", comment, rechecked:true, recheck_evidence:{...}}
+#   review_disagreement {pr_number, pr_digest, resolution:"human", columns:[...]}   # reviewers split; a human decides
+#   twin_deploy   {twin_id, where, image, finding_id, phase}
+#   retest        {finding_id, scenario, objective_complete:false, status:"green"|"red", phase}
 #   tests         {passed, total, regression_added}
+#   merge_ready   {pr_number, ready, blockers:[...], approved_by:[...], awaiting:"human"}   # gate passed; a human merges
 #   merge         {pr_number, by:"human", approved_by:[...]}
+#   release       {pr_number, digest, regression}   # after a human merges: the fixed bug becomes a permanent CI regression
 #   metrics       {minutes_exploit_to_fix, cost_usd, where:"EU", tested_surface, untested_surface, regression_tests}

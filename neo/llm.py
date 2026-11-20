@@ -11,6 +11,30 @@ class LLMError(RuntimeError):
     pass
 
 
+# Token + cost accounting (a boundary responsibility). One record per completion.
+USAGE = []
+# USD per 1M tokens (prompt, completion), gateway rates read 2026-11-20.
+_PRICE = {
+    "gemini-3.8-flash": (0.75, 3.75),
+    "gpt-6-luna": (0.10, 0.50),
+    "gpt-6.2-sol": (0.10, 0.50),
+}
+_DEFAULT_PRICE = (0.75, 3.75)
+
+
+def usage_summary():
+    pt = sum(u["usage"].get("prompt_tokens", 0) for u in USAGE)
+    ct = sum(u["usage"].get("completion_tokens", 0) for u in USAGE)
+    usd = 0.0
+    for u in USAGE:
+        pin, pout = _PRICE.get(u.get("served") or "", _DEFAULT_PRICE)
+        usd += (u["usage"].get("prompt_tokens", 0) / 1e6 * pin
+                + u["usage"].get("completion_tokens", 0) / 1e6 * pout)
+    return {"calls": len(USAGE), "prompt_tokens": pt, "completion_tokens": ct,
+            "est_usd": round(usd, 4),
+            "priced_as": "served-model gateway rates (2026-11-20), estimate"}
+
+
 def _key():
     k = os.environ.get(config.API_KEY_ENV)
     if not k:
@@ -39,6 +63,8 @@ def chat(model, messages, *, description, temperature=0.2, timeout=120, tools=No
             data = json.loads(r.read())
     except urllib.error.HTTPError as e:
         raise LLMError(f"gateway {e.code}: {e.read()[:400]!r}") from e
+    USAGE.append({"model": model, "served": data.get("model"),
+                  "usage": data.get("usage") or {}})
     return data["choices"][0]["message"]["content"] or ""
 
 
