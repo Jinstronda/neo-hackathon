@@ -1,0 +1,22 @@
+# secrets
+.env
+.env.*
+!.env.example
+*.pem
+id_rsa*
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+# node
+node_modules/
+.next/
+out/
+.vercel/
+# os / tooling
+.DS_Store
+*.log
+runs/tmp/
+twin-work/
