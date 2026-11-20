@@ -1,5 +1,6 @@
 'use client';
 import { motion } from 'motion/react';
+import { useEffect, useRef } from 'react';
 import { useRun } from './RunProvider';
 import { clock, text } from '@/lib/types';
 
@@ -56,17 +57,23 @@ const describe = (e: Record<string, unknown>) => {
     case 'tests': return `${text(e.passed)}/${text(e.total)} passed`;
     case 'metrics': return `${text(e.minutes_exploit_to_fix)} min, $${text(e.cost_usd)}`;
     case 'merge': return `PR #${text(e.pr_number)} merged by ${text(e.by)}`;
+    case 'exploit_run': return `${text(e.exploit)} exit ${text(e.exit)}`;
+    case 'retest_summary': return `${text(e.phase)} ${text(e.status)}`;
+    case 'merge_ready': return `waiting for a ${text(e.awaiting)}: ${(e.blockers as string[] | undefined)?.join('; ') ?? ''}`;
     default: return '';
   }
 };
 
 export function EventLog() {
   const { seen } = useRun();
+  const log = useRef<HTMLDivElement>(null);
+  // follow the newest line, like a build log
+  useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight }); }, [seen.length]);
   return (
     <section className="card" aria-label="Event stream">
       <div className="card-h">Event stream<span className="end num">{seen.length || ''}</span></div>
       {seen.length ? (
-        <div className="log" role="log" aria-live="polite">
+        <div className="log" role="log" aria-live="polite" ref={log}>
           {seen.map((e) => (
             <motion.div key={`${e.type}-${e.ts}`} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}>
               <span className="t num">{clock(e.ts)}</span>

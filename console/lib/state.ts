@@ -9,6 +9,7 @@ export type View = {
   timeline: TimelineRow[];
   findings: Finding[];
   pre?: RunEvent; post?: RunEvent; patch?: RunEvent; reviews: RunEvent[]; tests?: RunEvent; merge?: RunEvent; mergeReady?: RunEvent; started?: RunEvent;
+  proof: { scenario: string; before: boolean; after?: RunEvent }[];
   radar: RunEvent[]; twins: RunEvent[]; metrics: Partial<Metrics>; done: boolean;
 };
 
@@ -22,7 +23,15 @@ export function view(run: RunSummary, events: RunEvent[]): View {
   }));
   const pre = find(events, 'flag_check', (e) => e.phase === 'pre-patch');
   // the gate: the replay on the rebuilt twin (post-patch), never the pre-patch replay
-  const post = find(events, 'retest', (e) => e.phase === 'post-patch' || (e.phase === undefined && e.status === 'green')) || find(events, 'flag_check', (e) => e.phase === 'post-patch');
+  const postRetest = (e: RunEvent) => e.phase === 'post-patch' || (e.phase === undefined && e.status === 'green');
+  const post = find(events, 'retest', (e) => postRetest(e) && e.scenario === pre?.scenario) || find(events, 'retest', postRetest) || find(events, 'flag_check', (e) => e.phase === 'post-patch');
+  // one line per scenario: did the exploit land before the patch, and on the rebuilt twin
+  const scenarios = [...new Set(events.filter((e) => e.type === 'flag_check' && e.phase === 'pre-patch').map((e) => text(e.scenario)))];
+  const proof = scenarios.map((scenario) => ({
+    scenario,
+    before: objectiveReached(find(events, 'flag_check', (e) => e.phase === 'pre-patch' && e.scenario === scenario)),
+    after: find(events, 'retest', (e) => postRetest(e) && (e.scenario === scenario || (e.scenario === undefined && scenarios.length === 1))),
+  }));
   const patch = find(events, 'blue_patch');
   const reviews = events.filter((e) => e.type === 'review');
   const tests = find(events, 'tests');
@@ -38,7 +47,7 @@ export function view(run: RunSummary, events: RunEvent[]): View {
   const first = events.find((e) => e.type === 'red_finding');
   const timeline = [
     row('landed', 'Exploit landed', first, findings[0] ? `${findings[0].cls} on ${findings[0].location}` : '', 'red'),
-    row('diagnosed', 'Diagnosed', pre, pre ? `Server flag check: objective reached${findings[0]?.confirmedBy ? `, confirmed by ${findings[0].confirmedBy}` : ''}` : '', preWorks ? 'red' : 'plain'),
+    row('diagnosed', 'Diagnosed', pre, pre ? `Server flag check: objective reached${findings[0]?.confirmedBy && !/flag check/.test(findings[0].confirmedBy) ? `, confirmed by ${findings[0].confirmedBy}` : ''}` : '', preWorks ? 'red' : 'plain'),
     row('proposed', 'Patch proposed', patch, patch ? `${patch.pr_number ? `PR #${text(patch.pr_number)} ` : ''}${text(patch.branch)}` : ''),
     row('rebuilt', 'Twin rebuilt', rebuilt, rebuilt ? `${text(rebuilt.twin_id)} from ${text(rebuilt.image)}` : ''),
     row('retest', 'Retest', post, post ? (postDead ? 'Same exploit, objective not reached' : 'Exploit still works') : '', post ? (postDead ? 'green' : 'red') : 'plain'),
@@ -54,7 +63,6 @@ export function view(run: RunSummary, events: RunEvent[]): View {
       else if (started) { activity = pre ? 'Swept, no new finding' : 'Attacking the twin'; busy = !pre; }
     } else if (agent.role === 'blue') {
       if (patch) activity = patch.pr_number ? `Opened PR #${text(patch.pr_number)}` : `Patched ${text(patch.branch)}`;
-      else if (pre) { activity = 'Writing the patch'; busy = true; }
     } else {
       const own = reviews.find((r) => r.reviewer === agent.label);
       if (own) activity = own.verdict === 'approve' ? 'Approved after re-running the exploit' : 'Requested changes after re-running the exploit';
@@ -68,7 +76,7 @@ export function view(run: RunSummary, events: RunEvent[]): View {
     ...(metricsEvent.lockin_before !== undefined ? { lockin_before: num(metricsEvent.lockin_before), lockin_after: num(metricsEvent.lockin_after) } : {}),
   } : {};
   return {
-    agents, timeline, findings, pre, post, patch, reviews, tests, merge, mergeReady, started,
+    agents, timeline, findings, pre, post, patch, reviews, tests, merge, mergeReady, started, proof,
     radar: events.filter((e) => e.type === 'radar_match'), twins: events.filter((e) => e.type === 'twin_create' || (e.type === 'twin_deploy' && e.phase !== 'pre-patch')),
     metrics, done: Boolean(merge || metricsEvent),
   };
