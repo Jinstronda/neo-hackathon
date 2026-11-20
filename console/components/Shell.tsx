@@ -20,7 +20,7 @@ export function Shell({ children }: { children: ReactNode }) {
             NEO
           </Link>
           <span className="slash" aria-hidden="true">/</span>
-          <span className="crumb"><span className="avatar" aria-hidden="true" />demo-target</span>
+          <span className="crumb">demo-target</span>
           <div className="end">
             {source !== 'engine' && <span className="where">replay</span>}
             {operator ? <span className="where hide-sm">{operator}</span> : <Link className="btn" href="/login">Sign in</Link>}
