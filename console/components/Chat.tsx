@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRun } from './RunProvider';
 
 const prompts = ['Attack our demo app', 'What did you find?', 'Fix it', 'Approved'];
-const toolLabel: Record<string, string> = { attack_demo_app: 'Started the red team', read_findings: 'Read the findings', fix_finding: 'Patched and retested', approve_merge: 'Recorded the approval', run_status: 'Read the run' };
+const toolLabel: Record<string, string> = { attack_demo_app: 'Started the red team', read_findings: 'Read the findings', fix_finding: 'Opened the patch PR', approve_merge: 'Asked for the merge', run_status: 'Read the run' };
 
 export function Chat() {
   const { messages, input, handleInputChange, handleSubmit, append, status } = useRun().chat;

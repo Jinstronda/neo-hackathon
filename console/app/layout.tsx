@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import { RunProvider } from '@/components/RunProvider';
 import { loadRun } from '@/lib/engine';
+import { operator } from '@/lib/session';
 import { Shell } from '@/components/Shell';
 import './globals.css';
 
@@ -10,10 +11,11 @@ export const metadata: Metadata = { title: 'NEO', description: 'Nothing reaches 
 export const viewport: Viewport = { themeColor: '#0a0a0a', colorScheme: 'dark' };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const initial = await loadRun().catch(() => null);
+  const who = await operator();
+  const initial = await loadRun(Boolean(who)).catch(() => null);
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body><RunProvider initial={initial}><Shell>{children}</Shell></RunProvider></body>
+      <body><RunProvider initial={initial} operator={who}><Shell>{children}</Shell></RunProvider></body>
     </html>
   );
 }

@@ -1,5 +1,6 @@
 import { loadRun } from '@/lib/engine';
 import { phaseOf, type Phase, type RunEvent } from '@/lib/types';
+import { operator } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -13,6 +14,7 @@ const key = (e: RunEvent) => `${e.type}:${e.ts}`;
 export async function GET(request: Request) {
   const asked = new URL(request.url).searchParams.get('phase');
   const phase: Phase = asked === 'blue' || asked === 'merge' ? asked : 'red';
+  const live = Boolean(await operator());
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
@@ -20,7 +22,7 @@ export async function GET(request: Request) {
       let last: RunEvent | undefined, done = false;
       const deadline = Date.now() + 280_000;
       while (!done && Date.now() < deadline && !request.signal.aborted) {
-        const { events, source } = await loadRun();
+        const { events, source } = await loadRun(live);
         if (!sent.size) controller.enqueue(encoder.encode(`event: source\ndata: ${JSON.stringify({ source })}\n\n`));
         for (const event of events.filter((e) => phaseOf(e) === phase || (phase === 'red' && e.type === 'harness_error'))) {
           if (sent.has(key(event))) continue;
