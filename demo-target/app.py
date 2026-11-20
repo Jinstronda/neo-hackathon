@@ -47,7 +47,7 @@ META_PORT = int(os.environ.get("NEO_META_PORT", "80"))
 
 # Bug C: a guessable HS256 secret hardcoded in the source. The fix replaces this
 # with secrets.token_urlsafe(32) generated at startup (see FIXES.md).
-WEAK_JWT_SECRET = "neo-demo-secret"
+WEAK_JWT_SECRET = secrets.token_urlsafe(32)
 
 def _load_flat_config(path):
     cfg = {}
@@ -238,10 +238,9 @@ class WebHandler(BaseHTTPRequestHandler):
         log_event("login_attempt", username=user)
         con = sqlite3.connect(DB)
         try:
-            # Bug A: query built by string concatenation -> SQL injection auth bypass.
             q = ("SELECT username, role FROM users "
-                 f"WHERE username = '{user}' AND password = '{pw}'")
-            row = con.execute(q).fetchone()
+                 "WHERE username = ? AND password = ?")
+            row = con.execute(q, (user, pw)).fetchone()
         except sqlite3.Error as e:
             self._json(400, {"error": f"query error: {e}"})
             return
@@ -292,6 +291,20 @@ class WebHandler(BaseHTTPRequestHandler):
             return
         host = urllib.parse.urlparse(url).hostname
         log_event("avatar_fetch", url=url, host=host)
+        if not host or host == META_HOST:
+            self._json(400, {"error": "forbidden host"})
+            return
+        try:
+            import ipaddress
+            import socket
+            for _, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+                ip = ipaddress.ip_address(sockaddr[0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    self._json(400, {"error": "forbidden host"})
+                    return
+        except Exception:
+            self._json(400, {"error": "invalid host"})
+            return
         try:
             # Bug B: fetches any user-supplied URL server-side, no allowlist and
             # no block on internal/link-local addresses -> SSRF. The response body
