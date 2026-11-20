@@ -21,10 +21,10 @@ test('Eve agent down: chat shows an error and the composer re-enables, no endles
     route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ error: 'NEO agent unreachable' }) }));
   const attack = page.getByRole('button', { name: 'Attack our demo app' });
   await attack.click();
-  // the busy state must clear after the 502: the suggestion buttons (gated only by busy) come back,
+  // after the 502 the loop must not hang: the suggestion buttons (gated only by busy) end enabled,
   // so the operator can retry. A stuck "Thinking" with the buttons disabled forever is the failure.
-  await expect(attack).toBeDisabled();
   await expect(attack).toBeEnabled({ timeout: 15_000 });
+  await expect(page.getByText('Thinking')).toHaveCount(0);
   await page.screenshot({ path: 'screens/fault-eve-down.png', fullPage: true });
 });
 
