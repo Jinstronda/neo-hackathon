@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-20, terminal escape injection in neo/term.py, fixed and verified
+
+- Stripped C0/C1 control bytes (escape sequences included) from event-derived text in `_short()`, the single function every flagged call site (exploit tail, review comment, generic key=value fields) already routes through, rather than patching each call site separately. These fields come from subprocess output and model-written text, both untrusted, and the tool is meant to run against live future engine output, not just this one static demo-run. Verified with a direct test (`\x1b[31m` and a bell byte both neutralized to `?`, normal text and the real demo-run replay unchanged). Evidence: `neo/term.py` (`CTRL` regex, `_short`); commit `d25e43d`. [certain, two-way]
+
 ## 2026-11-20, the real /demo page: Palantir-grade visuals, sanitized Pi-skills port
 
 - Ran two parallel waves (6 agents): the real `/demo` page + terminal UI, the Pi-skills port, and CLI terminal polish; then the attack-graph, infra map, and live ticker, on strictly disjoint new files to avoid any collision. Did the final composition (wiring all 5 new components into one page) myself rather than a 7th agent round, since it needed tight iterative build-fix-build feedback. Evidence: workflow run ids wqq3ngxqz, w3nsyxynt; local `npm run build` passing after composition. [certain, two-way]
