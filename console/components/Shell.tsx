@@ -10,9 +10,9 @@ const sha = process.env.NEXT_PUBLIC_COMMIT_SHA?.slice(0, 7);
 
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const { source, operator } = useRun();
+  const { source, operator, playing } = useRun();
   return (
-    <div className="app">
+    <div className="app" data-playing={playing ?? undefined}>
       <header className="top">
         <div className="bar">
           <Link href="/" className="logo" aria-label="NEO">
