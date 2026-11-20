@@ -130,7 +130,8 @@ def harness(started):
                        "phase": "pre-patch", "objective_complete": bool(metrics.get("objective_complete")),
                        "evidence": [json.dumps(e) for e in metrics.get("evidence", [])][:4], "origin": "cloud"})
     except (OSError, ValueError):
-        events.append({"type": "harness_error", "ts": round(time.time(), 3), "detail": (proc.stderr or "")[-400:], "origin": "cloud"})
+        sys.stderr.write((proc.stderr or "")[-2000:])
+        events.append({"type": "harness_error", "ts": round(time.time(), 3), "detail": f"harness exited {proc.returncode}", "origin": "cloud"})
     with lock:
         state["live"] += events
         state["running"] = False
@@ -198,7 +199,13 @@ class Handler(BaseHTTPRequestHandler):
             if ready:
                 threading.Thread(target=fix, daemon=True).start()
         elif action == "approve":
-            emit({"type": "merge", "by": "human", "approved_by": ["security", "correctness"]})
+            with lock:
+                live = list(state["live"])
+            green = any(e["type"] == "retest" and e.get("status") == "green" for e in live)
+            approvers = [e["reviewer"] for e in live if e["type"] == "review" and e.get("verdict") == "approve"]
+            if not (green and len(approvers) == 2) or any(e["type"] == "merge" for e in live):
+                return self._send(409, {"error": "approve needs a green retest and two approving reviews"})
+            emit({"type": "merge", "by": "human", "approved_by": approvers})
         self._send(200, {"ok": True, "action": action, "scenario": SCENARIO})
 
     def log_message(self, *args):

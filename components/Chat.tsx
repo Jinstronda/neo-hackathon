@@ -1,5 +1,4 @@
 'use client';
-import { useChat } from '@ai-sdk/react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useRef } from 'react';
 import { useRun } from './RunProvider';
@@ -8,19 +7,8 @@ const prompts = ['Attack our demo app', 'What did you find?', 'Fix it', 'Approve
 const toolLabel: Record<string, string> = { attack_demo_app: 'Started the red team', read_findings: 'Read the findings', fix_finding: 'Patched and retested', approve_merge: 'Recorded the approval', run_status: 'Read the run' };
 
 export function Chat() {
-  const { play } = useRun();
-  const { messages, input, handleInputChange, handleSubmit, append, status, data } = useChat({ api: '/api/chat' });
-  const handled = useRef(0);
+  const { messages, input, handleInputChange, handleSubmit, append, status } = useRun().chat;
   const end = useRef<HTMLDivElement>(null);
-  // the agent's tool calls arrive as data parts; each one starts the matching engine phase on screen
-  useEffect(() => {
-    for (const part of (data ?? []).slice(handled.current) as { action?: string }[]) {
-      if (part?.action === 'attack') play('red');
-      if (part?.action === 'fix') play('blue');
-      if (part?.action === 'approve') play('merge');
-    }
-    handled.current = data?.length ?? 0;
-  }, [data, play]);
   useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages]);
   const busy = status === 'submitted' || status === 'streaming';
   return (
