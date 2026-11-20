@@ -1,4 +1,4 @@
-import { clock, num, text, type RunEvent } from '@/lib/types';
+import { clock, num, prTag, text, type RunEvent } from '@/lib/types';
 
 type Tone = 'red' | 'green' | 'amber' | '';
 type Line = { ts: number | null; who: string; msg: string; tone: Tone };
@@ -19,16 +19,16 @@ function narrate(e: RunEvent): Line | null {
     case 'red_start': return at('red', `${(e.models as unknown[] | undefined)?.length ?? 0} models attacking ${text(e.twin_id)}`);
     case 'red_finding': return at(text(e.model), `confirmed ${text(e.cls)} at ${text(e.location)}`, 'red');
     case 'flag_check': return at('flag', `${text(e.scenario)} ${text(e.phase)}: objective ${yes(e.objective_complete) ? 'reached' : 'not reached'}`, yes(e.objective_complete) ? 'red' : 'green');
-    case 'blue_patch': return at('blue', `opened PR #${text(e.pr_number)} on ${text(e.branch)}`);
+    case 'blue_patch': return at('blue', `opened ${prTag(e) || 'the patch'} on ${text(e.branch)}`);
     case 'review': return at(text(e.reviewer), text(e.verdict).replace('_', ' '), e.verdict === 'approve' ? 'green' : 'amber');
-    case 'review_disagreement': return at('review', `reviewers disagree on PR #${text(e.pr_number)}, routed to ${text(e.resolution)}`, 'amber');
+    case 'review_disagreement': return at('review', `reviewers disagree on ${prTag(e) || 'the patch'}, routed to ${text(e.resolution)}`, 'amber');
     case 'twin_create': case 'twin_deploy': return at('twin', `${text(e.twin_id)} up from ${text(e.image)}${e.phase ? ` (${text(e.phase)})` : ''}`);
     case 'exploit_run': return at('exploit', `${text(e.exploit)} exit ${text(e.exit)}, ${num(e.exit) === 0 ? 'landed' : 'dead'}`, num(e.exit) === 0 ? 'red' : 'green');
     case 'retest': return at('retest', `${text(e.scenario)} ${text(e.phase)}: ${text(e.status)}`, e.status === 'green' ? 'green' : 'red');
     case 'retest_summary': return at('retest', `${text(e.phase)} gate ${yes(e.gate_pass) ? 'pass' : 'fail'}, ${text(e.status)}`, e.status === 'green' ? 'green' : 'red');
     case 'tests': return at('tests', `${num(e.passed)}/${num(e.total)} passed, ${num(e.regression_added)} regression added`, yes(e.ok) ? 'green' : 'red');
-    case 'merge_ready': return at('merge', yes(e.ready) ? `PR #${text(e.pr_number)} ready` : `PR #${text(e.pr_number)} held for ${text(e.awaiting)}: ${(e.blockers as string[] | undefined)?.join('; ') ?? ''}`, 'amber');
-    case 'merge': return at('merge', `PR #${text(e.pr_number)} merged by ${text(e.by)}`, 'green');
+    case 'merge_ready': return at('merge', yes(e.ready) ? `${prTag(e) || 'patch'} ready` : `${prTag(e) || 'patch'} held for ${text(e.awaiting)}: ${(e.blockers as string[] | undefined)?.join('; ') ?? ''}`, 'amber');
+    case 'merge': return at('merge', `${prTag(e) || 'patch'} merged by ${text(e.by)}`, 'green');
     case 'metrics': return at('metrics', `${num(e.minutes_exploit_to_fix)} min exploit to fix, $${num(e.cost_usd).toFixed(4)}, ${text(e.where)}, surface ${num(e.tested_surface)} tested / ${num(e.untested_surface)} untested`);
     default: return null;
   }

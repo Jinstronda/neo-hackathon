@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRun } from './RunProvider';
-import { clock, num, text, type RunEvent } from '@/lib/types';
+import { clock, num, prTag, text, type RunEvent } from '@/lib/types';
 
 type Tone = 'red' | 'green' | 'amber' | 'soft' | '';
 type Line = { ts: number; who: string; msg: string; tone: Tone };
@@ -26,15 +26,15 @@ function narrate(e: RunEvent): Line | null {
     case 'flag_check': return yes(e.objective_complete)
       ? at('flag', `${text(e.scenario)} ${text(e.phase)}: objective reached`, 'red')
       : at('flag', `${text(e.scenario)} ${text(e.phase)}: objective not reached`, 'green');
-    case 'blue_patch': return at('blue', `opening PR #${text(e.pr_number)} on ${text(e.branch)}`);
+    case 'blue_patch': return at('blue', `opening ${prTag(e) || 'the patch'} on ${text(e.branch)}`);
     case 'review': return at('review', `${text(e.reviewer)} (${text(e.vendor)}): ${text(e.verdict)}`, e.verdict === 'approve' ? 'green' : 'amber');
-    case 'review_disagreement': return at('review', `vendors disagree on PR #${text(e.pr_number)}, resolution: ${text(e.resolution)}`, 'amber');
+    case 'review_disagreement': return at('review', `vendors disagree on ${prTag(e) || 'the patch'}, resolution: ${text(e.resolution)}`, 'amber');
     case 'exploit_run': return at('exploit', `${text(e.exploit)} exit ${text(e.exit)}  ${text(e.tail).trim().slice(0, 72)}`, num(e.exit) === 0 ? 'red' : 'green');
     case 'retest': return at('retest', `${text(e.scenario)} ${text(e.phase)}: ${text(e.status)}`, e.status === 'green' ? 'green' : 'red');
     case 'retest_summary': return at('retest', `${text(e.phase)} summary: ${text(e.status)}, gate ${yes(e.gate_pass) ? 'pass' : 'fail'}`, e.status === 'green' ? 'green' : 'red');
     case 'tests': return at('tests', `${num(e.passed)}/${num(e.total)} passed, ${num(e.regression_added)} regression tests added`, yes(e.ok) ? 'green' : 'red');
-    case 'merge_ready': return at('merge', yes(e.ready) ? `PR #${text(e.pr_number)} ready to merge` : `held for a ${text(e.awaiting)}: ${(e.blockers as string[] | undefined)?.join('; ') ?? ''}`, 'amber');
-    case 'merge': return at('merge', `PR #${text(e.pr_number)} merged by ${text(e.by)}`, 'green');
+    case 'merge_ready': return at('merge', yes(e.ready) ? `${prTag(e) || 'patch'} ready to merge` : `held for a ${text(e.awaiting)}: ${(e.blockers as string[] | undefined)?.join('; ') ?? ''}`, 'amber');
+    case 'merge': return at('merge', `${prTag(e) || 'patch'} merged by ${text(e.by)}`, 'green');
     case 'metrics': return at('metrics', `${num(e.minutes_exploit_to_fix)} min exploit to fix, $${num(e.cost_usd).toFixed(4)}, ${text(e.where)}`);
     default: return null;
   }

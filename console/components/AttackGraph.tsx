@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { clock, num, text, type RunEvent, type RunSummary } from '@/lib/types';
+import { clock, num, prTag, text, type RunEvent, type RunSummary } from '@/lib/types';
 
 // Kill chain as a node-link graph. Lit as far as the real events have progressed.
 type Tone = 'red' | 'blue' | 'green' | 'amber' | 'fg';
@@ -59,7 +59,7 @@ function graph(run: RunSummary, events: RunEvent[]) {
     }),
     { id: 'proof', x: col(4), y: ROWS[1], stage: 'Proof', title: 'confirmed', sub: 'server-side flag', on: d.proven.size > 0, tone: 'red', value: `${d.proven.size}/3 proven`, valueTone: 'red' },
     { id: 'blue', x: col(5), y: ROWS[1], stage: 'Fixer', title: 'fixer', sub: d.patch ? text(d.patch.branch) : 'waiting on proof', on: !!d.patch, tone: 'blue' },
-    { id: 'pr', x: col(6), y: ROWS[1], stage: 'Patch', title: d.patch ? `PR #${num(d.patch.pr_number)}` : 'PR', sub: d.patch ? `fixes ${text(d.patch.finding_id)}` : 'not opened', on: !!d.patch, tone: 'blue' },
+    { id: 'pr', x: col(6), y: ROWS[1], stage: 'Patch', title: d.patch ? prTag(d.patch) || 'Patch' : 'PR', sub: d.patch ? `fixes ${text(d.patch.finding_id)}` : 'not opened', on: !!d.patch, tone: 'blue' },
     { id: 'security', x: col(7), y: 190, stage: 'Review', title: 'security', sub: d.review('security') ? 'reviewer 1' : 'pending', on: !!d.review('security'), tone: 'blue', value: verdict(d.review('security')) || undefined, valueTone: vTone(d.review('security')) },
     { id: 'correctness', x: col(7), y: 310, stage: 'Review', title: 'correctness', sub: d.review('correctness') ? 'reviewer 2' : 'pending', on: !!d.review('correctness'), tone: 'blue', value: verdict(d.review('correctness')) || undefined, valueTone: vTone(d.review('correctness')) },
     { id: 'retest', x: col(8), y: ROWS[1], stage: 'Retest', title: 'twin rebuilt', sub: d.tests ? `${num(d.tests.passed)}/${num(d.tests.total)} tests pass` : d.deploy ? text(d.deploy.twin_id) : 'not rebuilt', on: !!d.deploy, tone: 'green', value: d.post.length ? `${live}/${d.post.length} exploits live` : undefined, valueTone: live ? 'red' : 'green' },

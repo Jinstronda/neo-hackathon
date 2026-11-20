@@ -1,6 +1,7 @@
 import 'server-only';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { honest } from './honest';
 import type { Run } from './types';
 
 // The NEO engine (neo-hackathon) owns runs. ENGINE_URL points at its API; without it the console
@@ -13,7 +14,7 @@ export async function bundled(): Promise<Run> {
   for (const [file, source] of [['demo-run.json', 'recorded'], ['fixture.json', 'fixture']] as const) {
     try {
       const data = JSON.parse(await readFile(path.join(process.cwd(), 'public', 'runs', file), 'utf8'));
-      return { run: data.run, events: data.events, source };
+      return honest({ run: data.run, events: data.events, source });
     } catch { /* next */ }
   }
   throw new Error('no run available');
@@ -24,7 +25,7 @@ export async function loadRun(live = false): Promise<Run> {
   if (live && ENGINE_URL) {
     try {
       const response = await fetch(`${ENGINE_URL}/api/run`, { cache: 'no-store', headers: auth(), signal: AbortSignal.timeout(6000) });
-      if (response.ok) { const data = await response.json(); return { run: data.run, events: data.events, source: data.source === 'fixture' ? 'fixture' : 'engine' }; }
+      if (response.ok) { const data = await response.json(); return honest({ run: data.run, events: data.events, source: data.source === 'fixture' ? 'fixture' : 'engine' }); }
     } catch { /* engine unreachable: fall back */ }
   }
   return bundled();
