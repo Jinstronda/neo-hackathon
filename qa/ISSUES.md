@@ -56,3 +56,28 @@ credential, so it is low severity. But `runs/` is only partly ignored (`runs/tmp
 `runs/.clone-*/`), so `runs/demo-run/` and `runs/prs/` would land in the public repo on a
 `git add runs/`. Fix: gitignore all run outputs (`runs/*/`) or scrub the one run that gets
 bundled. Git history is clean on both repos; `.env` is ignored.
+
+## Runner hardening (ws25, cloud runner owner) — RESOLVED and deployed to the box
+
+The cloud runner (`console/ops/cloud_runner.py`, mirrored in `neo-web/ops/`) is the server-side
+gate. All items below are fixed, verified by `qa/contract/test_cloud_runner.py` (4 self-checks,
+stdlib) and by a full real loop on the box (`source=engine`, 15 events, contract all PASS,
+no secret in the served run). Deployed to `~/neo/runner/cloud_runner.py` and `neo-runner`
+restarted; the previous runner is kept as `cloud_runner.py.bak-*`.
+
+- Forged approval / missing state check: the approve gate now requires a proven pre-patch exploit,
+  a green post-patch retest, the exact `{security, correctness}` approver set with no
+  `request_changes`, and not-already-merged, all decided server-side. A client claim cannot merge.
+- Sensitive data in events: the whole served response is scrubbed, not only the error path:
+  full auth-header lines, JWTs, private keys, `secret=`/quoted-key assignments, every env secret
+  and its base64/url-encoded forms, and any value under a secret-named key.
+- Cross-run contamination: each run carries a generation id; a late event from a previous run's
+  fix thread is dropped and cannot reach the gate; `attack` refuses while a run is in flight.
+- Fail-closed DoS: `fix()` and `attack()` release their locks in a `finally`, so a crash emits an
+  error event instead of wedging the runner against every later attack.
+- Live path parity: the live run now emits the event shape the console reads (a stable
+  `pr_number`/`pr_url` on blue_patch/review/merge, surface and cost metrics mirrored from
+  `run.metrics`), so `source=engine` shows real PR numbers and filled numbers, not `undefined`.
+
+Shipped on branch `ws25-runner-hardening` (preview only; not merged to master to avoid an
+unrequested production deploy). The box runs the hardened runner now.
