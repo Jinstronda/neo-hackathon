@@ -48,3 +48,11 @@ the agent is slow. The e2e waits 70s on this step.
 Via the Numbers tab (client-side Link) after running the loop, it fills. A full reload or a deep
 link to `/numbers` shows "No finished run yet" because `seen` is empty. Fix: fall back to
 `run.metrics` in `lib/state.ts view()` when no metrics event is present.
+
+### P1-3 Engine run outputs are committable and trip the secret scan, ws21
+`gitleaks dir` on neo-hackathon finds a JWT in `runs/demo-run/events.jsonl`. It is the
+weak-jwt-secret finding's own demo evidence (a forged token on a disposable twin), not a real
+credential, so it is low severity. But `runs/` is only partly ignored (`runs/tmp/`,
+`runs/.clone-*/`), so `runs/demo-run/` and `runs/prs/` would land in the public repo on a
+`git add runs/`. Fix: gitignore all run outputs (`runs/*/`) or scrub the one run that gets
+bundled. Git history is clean on both repos; `.env` is ignored.
