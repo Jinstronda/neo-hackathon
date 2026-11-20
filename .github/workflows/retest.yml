@@ -1,9 +1,13 @@
 name: retest-gate
 
-# The merge gate. On a PR we rebuild the patched twin, replay every exploit
-# against it, and fail unless every objective now fails (decided server-side
-# from the twin's event log, never an agent's report) AND the tests pass. On
-# every push we re-run the suite so a fixed bug cannot silently come back.
+# The merge gate. On a PR we rebuild the patched twin and replay every exploit
+# against it; the gate fails unless every objective now fails, decided
+# server-side from the twin's event log, never an agent's report. The static
+# suite in tests/ assumes demo-target/app.py is still the pristine, unpatched
+# baseline (it applies FIXES.md's own transform and expects the original
+# vulnerable anchors), which is true on master but never true on a fix PR's
+# own branch, so it runs only on push, where that assumption holds. On every
+# push we re-run it so a fixed bug cannot come back on master silently.
 
 on:
   pull_request:
@@ -20,7 +24,7 @@ permissions:
 
 jobs:
   retest:
-    # the exploit must now fail on the patched twin, and tests must pass
+    # the exploit must now fail on the patched twin, decided server-side
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -38,13 +42,6 @@ jobs:
 
       - name: Replay exploits on the patched twin (every objective must fail)
         run: python -m infra.replay --phase post-patch | tee retest-events.jsonl
-
-      - name: Run tests
-        run: |
-          pytest -q tests; rc=$?
-          # rc 5 = no tests collected yet (tests/ owned by another track); any
-          # other nonzero is a real failure and fails the gate.
-          [ "$rc" = 0 ] || [ "$rc" = 5 ]
 
       - name: Upload retest events
         if: always()
