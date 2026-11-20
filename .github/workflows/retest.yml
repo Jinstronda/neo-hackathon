@@ -12,6 +12,8 @@ name: retest-gate
 on:
   pull_request:
     branches: [main, master, joao]
+    # only a PR that changes the target has a patch to retest
+    paths: ['demo-target/**']
   push:
     branches: [main, master, joao]
 
