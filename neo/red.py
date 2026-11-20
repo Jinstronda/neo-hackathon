@@ -8,6 +8,12 @@ Public UI shows the models as model-1..model-n; their names stay in config. The
 reasoning (plan, judge) runs on the open-weight models through neo/llm.py; the
 attack itself is a vetted reference primitive, so a model reasons about the
 target but cannot run arbitrary code against it.
+
+Methodology this enforces:
+  neo/skills/breachbench/SKILL.md     server-side evidence decides, not the model;
+                                      a class counts only on confirm or reproduction.
+  neo/skills/adversary-review/SKILL.md grade demonstrated impact, never potential;
+                                      the severity gate before any report line.
 """
 import time
 

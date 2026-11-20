@@ -17,7 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import blue, config, env, factory, gate, llm, radar, red, shots
+from . import blue, config, env, factory, gate, llm, radar, red, shots, term
 from .journal import Journal
 
 REPO = Path(__file__).resolve().parent.parent
@@ -94,6 +94,7 @@ def loop(run_id="demo-run", *, repo="Jinstronda/neo-hackathon", models=None, scr
     run_dir = RUNS / run_id
     shutil.rmtree(run_dir, ignore_errors=True)
     j = Journal(run_dir)
+    term.attach(j)  # live terminal view of every journal event
     workdir = REPO / "runs" / f".clone-{run_id}"
 
     # 1. radar -------------------------------------------------------------
