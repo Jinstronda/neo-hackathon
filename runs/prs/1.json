@@ -1,0 +1,64 @@
+{
+ "number": 1,
+ "url": "local://pr/1",
+ "mode": "local",
+ "repo": null,
+ "branch": "neo/fix-A1",
+ "base": "master",
+ "title": "fix: close sql-injection, ssrf, weak-jwt-secret at GET /admin/whoami forged admin token; POST /import-avatar url parameter; POST /login username parameter",
+ "body": "## Fix: sql-injection, ssrf, weak-jwt-secret at GET /admin/whoami forged admin token; POST /import-avatar url parameter; POST /login username parameter\n\nFinding `A1` was proven on a disposable twin. The server-side flag check went red before this patch.\n\n### Exploit request\n```\nNEO proved these on a disposable twin:\n- sql-injection at POST /login username parameter (proven server-side, confirmed_by=server-side flag check)\n- ssrf at POST /import-avatar url parameter (proven server-side, confirmed_by=server-side flag check)\n- weak-jwt-secret at GET /admin/whoami forged admin token (proven server-side, confirmed_by=server-side flag check)\n```\n### Server-side flag check (pre-patch)\n```json\n{\n \"objective_complete\": true\n}\n```\n### Merge rule\nMerge only when the same exploit replays against a fresh patched twin, the flag check stays green, the tests pass, and both reviewers approve this exact diff.\n\nPatch digest: `45065bb1bed69256e222e4690904262acc0159e5959b6b501127d2b415fe5350`",
+ "diff": "diff --git a/demo-target/app.py b/demo-target/app.py\nindex 1c4cc6f..212ce9a 100644\n--- a/demo-target/app.py\n+++ b/demo-target/app.py\n@@ -47,7 +47,7 @@ META_PORT = int(os.environ.get(\"NEO_META_PORT\", \"80\"))\n \n # Bug C: a guessable HS256 secret hardcoded in the source. The fix replaces this\n # with secrets.token_urlsafe(32) generated at startup (see FIXES.md).\n-WEAK_JWT_SECRET = \"neo-demo-secret\"\n+WEAK_JWT_SECRET = os.environ.get(\"JWT_SECRET\") or secrets.token_urlsafe(32)\n \n def _load_flat_config(path):\n     cfg = {}\n@@ -239,9 +239,9 @@ class WebHandler(BaseHTTPRequestHandler):\n         con = sqlite3.connect(DB)\n         try:\n             # Bug A: query built by string concatenation -> SQL injection auth bypass.\n-            q = (\"SELECT username, role FROM users \"\n-                 f\"WHERE username = '{user}' AND password = '{pw}'\")\n-            row = con.execute(q).fetchone()\n+            row = con.execute(\n+                \"SELECT username, role FROM users WHERE username = ? AND password = ?\",\n+                (user, pw)).fetchone()\n         except sqlite3.Error as e:\n             self._json(400, {\"error\": f\"query error: {e}\"})\n             return\n@@ -291,6 +291,18 @@ class WebHandler(BaseHTTPRequestHandler):\n             self._json(400, {\"error\": \"url must be http(s)\"})\n             return\n         host = urllib.parse.urlparse(url).hostname\n+        import ipaddress, socket as _socket\n+        try:\n+            _addrs = {ai[4][0] for ai in _socket.getaddrinfo(host, None)}\n+        except _socket.gaierror:\n+            self._json(400, {\"error\": \"cannot resolve host\"})\n+            return\n+        for _a in _addrs:\n+            _ip = ipaddress.ip_address(_a)\n+            if _ip.is_private or _ip.is_loopback or _ip.is_link_local or _ip.is_reserved:\n+                log_event(\"ssrf_blocked\", url=url, host=host)\n+                self._json(400, {\"error\": \"refusing to fetch internal address\"})\n+                return\n         log_event(\"avatar_fetch\", url=url, host=host)\n         try:\n             # Bug B: fetches any user-supplied URL server-side, no allowlist and\ndiff --git a/demo-target/requirements.txt b/demo-target/requirements.txt\nindex 2627b4c..c151bb9 100644\n--- a/demo-target/requirements.txt\n+++ b/demo-target/requirements.txt\n@@ -2,4 +2,4 @@\n # CVE-2020-14343 (arbitrary code execution via the FullLoader), which the radar\n # matches against the staged KEV entry in neo/fixtures/kev_staged.json.\n # Intended fix (see FIXES.md): bump to PyYAML>=6.0.1.\n-PyYAML==5.3.1\n+PyYAML>=6.0.1\n",
+ "digest": "45065bb1bed69256e222e4690904262acc0159e5959b6b501127d2b415fe5350",
+ "finding": {
+  "finding_id": "A1",
+  "scenario": "sql-injection",
+  "cls": "sql-injection, ssrf, weak-jwt-secret",
+  "location": "GET /admin/whoami forged admin token; POST /import-avatar url parameter; POST /login username parameter",
+  "confirmed_by": "server-side flag check",
+  "request": "NEO proved these on a disposable twin:\n- sql-injection at POST /login username parameter (proven server-side, confirmed_by=server-side flag check)\n- ssrf at POST /import-avatar url parameter (proven server-side, confirmed_by=server-side flag check)\n- weak-jwt-secret at GET /admin/whoami forged admin token (proven server-side, confirmed_by=server-side flag check)",
+  "exploit": "demo-target/exploit_sqli.py",
+  "check": "checks/check_sqli.py",
+  "flag_check": {
+   "objective_complete": true
+  },
+  "all_findings": [
+   {
+    "finding_id": "A1",
+    "scenario": "sql-injection",
+    "cls": "sql-injection",
+    "location": "POST /login username parameter",
+    "confirmed_by": "server-side flag check",
+    "request": "POST /login",
+    "exploit": "demo-target/exploit_sqli.py",
+    "check": "checks/check_sqli.py",
+    "flag_check": {
+     "objective_complete": true
+    }
+   },
+   {
+    "finding_id": "B1",
+    "scenario": "ssrf-metadata",
+    "cls": "ssrf",
+    "location": "POST /import-avatar url parameter",
+    "confirmed_by": "server-side flag check",
+    "request": "POST /import-avatar",
+    "flag_check": {
+     "objective_complete": true
+    }
+   },
+   {
+    "finding_id": "C1",
+    "scenario": "weak-jwt-secret",
+    "cls": "weak-jwt-secret",
+    "location": "GET /admin/whoami forged admin token",
+    "confirmed_by": "server-side flag check",
+    "request": "GET /admin/whoami",
+    "flag_check": {
+     "objective_complete": true
+    }
+   }
+  ]
+ },
+ "date": "2026-11-20",
+ "status": "open"
+}

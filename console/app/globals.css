@@ -1,4 +1,4 @@
-/* NEO console tokens. One file, Geist scale, dark only. Ported from the HAL Geist layer. */
+/* NEO console tokens. One file, Geist scale, dark only. */
 :root {
   --bg: #0a0a0a; --bg-2: #000; --surface: #111; --hover: #1a1a1a; --active: #1f1f1f;
   --line: #242424; --line-2: #2e2e2e; --line-3: #454545;
