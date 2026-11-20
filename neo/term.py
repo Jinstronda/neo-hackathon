@@ -21,6 +21,9 @@ COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 CODES = {"red": "31", "grn": "32", "yel": "33", "blu": "34", "mag": "35", "cyn": "36",
          "dim": "2", "b": "1"}
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
+# strips C0/C1 control bytes (escape sequences included) from event-derived text before it
+# ever reaches a real terminal; exploit output and model-written text are untrusted data
+CTRL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 WIDTH = 96
 
 # event type -> loop step (same order as orchestrator.STEPS)
@@ -57,7 +60,7 @@ def _kv(items):
 
 
 def _short(s, n=WIDTH - 12):
-    return textwrap.shorten(" ".join(str(s).split()), n, placeholder=" ...")
+    return textwrap.shorten(" ".join(CTRL.sub("?", str(s)).split()), n, placeholder=" ...")
 
 
 def _diffstat(diff):
