@@ -21,13 +21,13 @@ export function Numbers() {
   if (!m || m.minutes_exploit_to_fix === undefined) return <section className="card"><div className="empty"><strong>No finished run yet</strong>Numbers fill when the loop reaches verified</div></section>;
   const total = (m.tested_surface ?? 0) + (m.untested_surface ?? 0) || 1;
   const tested = Math.round(((m.tested_surface ?? 0) / total) * 100);
-  const cols = 2 + (real ? 1 : 0) + (real && m.cost_usd ? 1 : 0);
+  const cols = 2 + (real && m.regression_tests ? 1 : 0) + (real && m.cost_usd ? 1 : 0);
   return (
     <div className="stack">
       <section className="card stats" aria-label="Run numbers" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
         <div className="stat"><span>Exploit to verified fix</span><Count to={m.minutes_exploit_to_fix} format={(v) => `${Math.round(v)} min`} /></div>
         {real && m.cost_usd ? <div className="stat"><span>Model cost, est.</span><Count to={m.cost_usd} format={(v) => `$${v.toFixed(2)}`} /></div> : null}
-        {real ? <div className="stat"><span>Regression tests</span><Count to={m.regression_tests ?? 0} format={(v) => `${Math.round(v)}`} /></div> : null}
+        {real && m.regression_tests ? <div className="stat"><span>Regression tests</span><Count to={m.regression_tests ?? 0} format={(v) => `${Math.round(v)}`} /></div> : null}
         <div className="stat"><span>Runs on</span><strong>{m.where}</strong></div>
       </section>
       {real && total > 1 && <section className="card surface" aria-label="Surface">

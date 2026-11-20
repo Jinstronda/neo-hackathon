@@ -66,7 +66,7 @@ export default function InfraMap({ run, events }: { run: RunSummary; events: Run
   const detail: Record<NodeId, string> = {
     twin: twinIds.length ? `${twinIds.length} disposable twin${twinIds.length > 1 ? 's' : ''}` : 'no twin yet',
     gateway: calls !== undefined ? `${calls} calls, run total` : 'model calls',
-    github: pr ? `PR #${pr}, ${events.filter((e) => e.type === 'review').length} reviews` : 'waiting for a patch',
+    github: prEvent ? `${pr ? `PR #${pr}` : 'patch'}, ${events.filter((e) => e.type === 'review').length} reviews` : 'waiting for a patch',
     console: done ? 'run recorded' : 'streaming events',
   };
 

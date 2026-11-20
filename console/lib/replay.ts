@@ -1,5 +1,5 @@
 import 'server-only';
-import { text, type RunEvent } from './types';
+import { prTag, text, type RunEvent } from './types';
 
 // Replay chat: NEO's lines for the recorded run, built only from that run's events.
 type Turn = { tool: string; action?: string; reply: string };
@@ -25,7 +25,7 @@ export function replayTurn(message: string, events: RunEvent[]): Turn {
     const green = all(events, 'retest').filter((e) => e.phase === 'post-patch' && e.status === 'green');
     const tests = all(events, 'tests')[0];
     return { tool: 'fix_finding', action: 'fix', reply: patch
-      ? `Patch PR #${text(patch.pr_number)} is open. Replayed on the rebuilt twin, ${green.length} of ${green.length} exploits fail. Tests ${text(tests?.passed)}/${text(tests?.total)}. Waiting for your approval.`
+      ? `${prTag(patch) ? `Patch ${prTag(patch)} is open.` : 'The patch is up.'} Replayed on the rebuilt twin, ${green.length} of ${green.length} exploits fail. Tests ${text(tests?.passed)}/${text(tests?.total)}. Waiting for your approval.`
       : 'No patch in this run.' };
   }
   if (/approv|merge|ship/.test(m)) {

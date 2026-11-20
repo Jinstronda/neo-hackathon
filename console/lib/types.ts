@@ -12,6 +12,7 @@ export type Source = 'engine' | 'recorded' | 'fixture';
 export type Run = { run: RunSummary; events: RunEvent[]; source: Source };
 
 export const text = (value: unknown) => typeof value === 'string' ? value : value == null ? '' : String(value);
+export const prTag = (e?: Record<string, unknown>) => (e?.pr_number ? `PR #${text(e.pr_number)}` : '');
 export const num = (value: unknown) => typeof value === 'number' ? value : Number(value) || 0;
 
 export function clock(ts: number): string {
