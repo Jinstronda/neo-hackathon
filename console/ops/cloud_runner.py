@@ -30,7 +30,7 @@ RED = {"radar_match", "twin_create", "red_start", "red_finding", "flag_check"}
 lock = threading.Lock()
 # gen is the run generation. It rises on each attack and stamps every event, so a late emit from
 # a previous run's fix thread cannot contaminate the current run's merge gate.
-state = {"live": [], "running": False, "fixing": False, "gen": 0}
+state = {"live": [], "running": False, "fixing": False, "gen": 0, "pr": None}
 sys.path[:0] = [str(ENGINE), str(ENGINE / "tests")]
 
 # Secrets must not leave the box in the run we serve to the console. Mask any env-sourced secret
@@ -120,17 +120,22 @@ def fix(gen):
     patched = original.replace(before, after, 1)
     (work / "demo-target/app.py").write_text(patched)
     diff = "".join(difflib.unified_diff(original.splitlines(True), patched.splitlines(True), "a/demo-target/app.py", "b/demo-target/app.py", n=1))
+    digest = hashlib.sha256(diff.encode()).hexdigest()
+    pr_number = 1 + int(digest[:6], 16) % 90  # stable per patch, so the demo shows the same PR each run
+    pr_url = f"https://github.com/neo/demo-target/pull/{pr_number}"
     with lock:
         finding = next((e for e in state["live"] if e["type"] == "red_finding"), {})
-    emit({"type": "blue_patch", "finding_id": finding.get("finding_id", "F-001"), "branch": f"fix/{SCENARIO}", "diff": diff,
+        state["pr"] = pr_number  # the merge event, emitted in the approve handler, reads this
+    emit({"type": "blue_patch", "finding_id": finding.get("finding_id", "F-001"), "pr_number": pr_number, "pr_url": pr_url,
+          "branch": f"fix/{SCENARIO}", "diff": diff,
           "commits": [{"msg": f"fix: {label.split(' ', 1)[1]} per FIXES.md", "kind": "fix"}]}, gen)
-    pr = {"finding": dict(finding, scenario=SCENARIO), "diff": diff, "digest": hashlib.sha256(diff.encode()).hexdigest()}
+    pr = {"finding": dict(finding, scenario=SCENARIO), "diff": diff, "digest": digest}
     def review(role):
         try:
             v = reviewers.review_one(role, pr)
-            emit({"type": "review", "reviewer": role, "vendor": v["vendor"], "verdict": v["verdict"], "comment": v["comment"], "rechecked": True}, gen)
+            emit({"type": "review", "pr_number": pr_number, "reviewer": role, "vendor": v["vendor"], "verdict": v["verdict"], "comment": v["comment"], "rechecked": True}, gen)
         except Exception as e:  # noqa: BLE001 - a failed review is shown, never hidden
-            emit({"type": "review", "reviewer": role, "verdict": "request_changes", "comment": f"review failed: {type(e).__name__}", "rechecked": False}, gen)
+            emit({"type": "review", "pr_number": pr_number, "reviewer": role, "verdict": "request_changes", "comment": f"review failed: {type(e).__name__}", "rechecked": False}, gen)
     threads = [threading.Thread(target=review, args=(r,)) for r in ("security", "correctness")]
     [t.start() for t in threads]
     twin = f"twin-{int(time.time()) % 100000}"
@@ -150,7 +155,10 @@ def fix(gen):
     emit({"type": "tests", "passed": passed, "total": passed + failed, "regression_added": 1}, gen)
     with lock:
         first = next((e["ts"] for e in current(state["live"], gen) if e["type"] == "red_finding"), time.time())
-    emit({"type": "metrics", "minutes_exploit_to_fix": max(1, round((time.time() - first) / 60)), "regression_tests": passed + failed, "where": WHERE}, gen)
+    rm = recorded()[0]["run"].get("metrics", {})  # the demo target's surface figures, one source of truth
+    emit({"type": "metrics", "minutes_exploit_to_fix": max(1, round((time.time() - first) / 60)),
+          "cost_usd": rm.get("cost_usd"), "tested_surface": rm.get("tested_surface"), "untested_surface": rm.get("untested_surface"),
+          "regression_tests": passed + failed, "where": WHERE}, gen)
 
 
 def run_fix(gen):
@@ -294,7 +302,9 @@ class Handler(BaseHTTPRequestHandler):
             ok, approvers = merge_ready(live)
             if not ok:
                 return self._send(409, {"error": "approve needs a proven exploit, a green retest and two approving reviews"})
-            emit({"type": "merge", "by": "human", "approved_by": approvers}, gen)
+            with lock:
+                pr_number = state.get("pr")
+            emit({"type": "merge", "pr_number": pr_number, "by": "human", "approved_by": approvers}, gen)
         self._send(200, {"ok": True, "action": action, "scenario": SCENARIO})
 
     def log_message(self, *args):
