@@ -172,3 +172,4 @@ tbody tr:hover { background: var(--hover); }
 .proof > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 14px 16px; border-top: 1px solid var(--line); font-size: var(--t-16); }
 .proof > div:first-child { border-top: 0; }
 @media (max-width: 720px) { .proof > div { grid-template-columns: 1fr; gap: 4px; } }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
