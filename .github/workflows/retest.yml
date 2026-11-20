@@ -11,9 +11,9 @@ name: retest-gate
 
 on:
   pull_request:
-    branches: [main, joao]
+    branches: [main, master, joao]
   push:
-    branches: [main, joao]
+    branches: [main, master, joao]
 
 concurrency:
   group: retest-${{ github.ref }}

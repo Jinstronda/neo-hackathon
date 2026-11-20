@@ -1,0 +1,236 @@
+{
+  "id": "demo-run",
+  "title": "NEO closed-loop run",
+  "date": "2026-11-20",
+  "where": "EU",
+  "agents": [
+    {
+      "id": "neo-1",
+      "role": "red",
+      "label": "model-1",
+      "status": "done"
+    },
+    {
+      "id": "neo-2",
+      "role": "red",
+      "label": "model-2",
+      "status": "done"
+    },
+    {
+      "id": "neo-3",
+      "role": "red",
+      "label": "model-3",
+      "status": "done"
+    },
+    {
+      "id": "blue",
+      "role": "blue",
+      "label": "fixer",
+      "status": "done"
+    },
+    {
+      "id": "rev-sec",
+      "role": "reviewer",
+      "label": "security",
+      "status": "approve"
+    },
+    {
+      "id": "rev-cor",
+      "role": "reviewer",
+      "label": "correctness",
+      "status": "request_changes"
+    }
+  ],
+  "steps": [
+    {
+      "key": "radar",
+      "title": "Radar match",
+      "live": false,
+      "events": [
+        "radar_match"
+      ]
+    },
+    {
+      "key": "red",
+      "title": "NEO proves the exploit",
+      "live": true,
+      "events": [
+        "red_start",
+        "red_finding",
+        "flag_check"
+      ]
+    },
+    {
+      "key": "blue",
+      "title": "Blue opens the patch PR",
+      "live": true,
+      "events": [
+        "blue_patch"
+      ]
+    },
+    {
+      "key": "review",
+      "title": "Two reviewers check the PR",
+      "live": true,
+      "events": [
+        "review"
+      ]
+    },
+    {
+      "key": "retest",
+      "title": "Twin rebuilt, exploit replayed",
+      "live": true,
+      "events": [
+        "twin_deploy",
+        "retest",
+        "tests"
+      ]
+    },
+    {
+      "key": "merge",
+      "title": "Human merges",
+      "live": false,
+      "events": [
+        "merge_ready",
+        "merge"
+      ]
+    }
+  ],
+  "metrics": {
+    "minutes_exploit_to_fix": 7.75,
+    "cost_usd": 0.0932,
+    "cost_detail": {
+      "calls": 21,
+      "prompt_tokens": 14061,
+      "completion_tokens": 22048,
+      "est_usd": 0.0932,
+      "priced_as": "served-model gateway rates (2026-11-20), estimate"
+    },
+    "where": "EU",
+    "tested_surface": 3,
+    "untested_surface": 2,
+    "regression_tests": 3,
+    "tests_passed": "10/10"
+  },
+  "radar": {
+    "package": "pyyaml",
+    "version": "5.3.1",
+    "ecosystem": "PyPI",
+    "cve": "CVE-2020-14343",
+    "osv": [
+      "GHSA-8q59-q68h-6hv4",
+      "PYSEC-2021-142"
+    ],
+    "summary": "Improper Input Validation in PyYAML",
+    "kev": true,
+    "epss": 0.0624,
+    "reachable": true
+  },
+  "findings": [
+    {
+      "finding_id": "A1",
+      "scenario": "sql-injection",
+      "cls": "sql-injection",
+      "location": "POST /login username parameter",
+      "confirmed_by": "server-side flag check",
+      "found_by": [
+        "model-1",
+        "model-2",
+        "model-3"
+      ]
+    },
+    {
+      "finding_id": "B1",
+      "scenario": "ssrf-metadata",
+      "cls": "ssrf",
+      "location": "POST /import-avatar url parameter",
+      "confirmed_by": "server-side flag check",
+      "found_by": [
+        "model-1",
+        "model-2",
+        "model-3"
+      ]
+    },
+    {
+      "finding_id": "C1",
+      "scenario": "weak-jwt-secret",
+      "cls": "weak-jwt-secret",
+      "location": "GET /admin/whoami forged admin token",
+      "confirmed_by": "server-side flag check",
+      "found_by": [
+        "model-1",
+        "model-2",
+        "model-3"
+      ]
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/Jinstronda/neo-hackathon/pull/1",
+    "number": 1,
+    "mode": "github",
+    "branch": "neo/fix-A1",
+    "digest": "8015687a3b625a44e2994113f98af100bbb1020e1d28d640ad469b4833e265ca",
+    "patch_source": "model"
+  },
+  "review": {
+    "passed": false,
+    "comment_urls": [
+      "https://github.com/Jinstronda/neo-hackathon/pull/1#issuecomment-7040035501",
+      "https://github.com/Jinstronda/neo-hackathon/pull/1#issuecomment-7040036081"
+    ],
+    "verdicts": [
+      {
+        "reviewer": "security",
+        "vendor": "OpenAI",
+        "verdict": "approve",
+        "comment": "The SQL injection vulnerability is resolved by using parameterized queries with SQLite placeholders. The SSRF and weak JWT secret findings are also mitigated by resolving host IP addresses against private ranges and generating a random secret at startup."
+      },
+      {
+        "reviewer": "correctness",
+        "vendor": "Anthropic",
+        "verdict": "request_changes",
+        "comment": "The patch correctly fixes the SQL injection, SSRF, and weak JWT secret vulnerabilities without introducing regressions. Parameterized queries and IP validation preserve normal operation for valid requests. [recheck: recheck produced no claims]"
+      }
+    ]
+  },
+  "retest": {
+    "post_patch_green": true,
+    "tests": "10/10",
+    "results": [
+      {
+        "check": "check_jwt",
+        "scenario": "weak-jwt-secret",
+        "objective_complete": false
+      },
+      {
+        "check": "check_sqli",
+        "scenario": "sql-injection",
+        "objective_complete": false
+      },
+      {
+        "check": "check_ssrf",
+        "scenario": "ssrf-metadata",
+        "objective_complete": false
+      }
+    ]
+  },
+  "merge": {
+    "ready": false,
+    "blockers": [
+      "correctness reviewer requested changes"
+    ],
+    "approved_by": [
+      "security:OpenAI"
+    ],
+    "awaiting": "human",
+    "merged": false
+  },
+  "verification": {
+    "exploits_dead": {
+      "sql-injection": true,
+      "ssrf-metadata": true,
+      "weak-jwt-secret": true
+    },
+    "legit_login_ok": true
+  }
+}

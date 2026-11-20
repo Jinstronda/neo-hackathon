@@ -1,4 +1,5 @@
 node_modules/
 .venv/
 runs/*/trace.zip
+runs/*/*.webm
 raw/*.tmp

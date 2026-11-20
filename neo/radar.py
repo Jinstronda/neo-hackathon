@@ -12,6 +12,11 @@ Rank: in KEV first, then by EPSS, then "reachable" (a direct dependency). A CVE
 is not a finding — this is a worklist. Proof comes later, when the exploit fires
 on the twin and dies on the patch.
 
+Methodology: neo/skills/cve-intake/SKILL.md (radar is read-only and never
+contacts a target; the triage gates and local-repro rules gate adoption into a
+run). Feeds the red swarm, which scores every finding through
+neo/skills/adversary-review/SKILL.md.
+
 stdlib only; every call goes out read-only, nothing touches a target.
 """
 import argparse

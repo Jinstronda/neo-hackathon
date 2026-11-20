@@ -18,5 +18,9 @@ out/
 # os / tooling
 .DS_Store
 *.log
-runs/tmp/
+runs/*/
 twin-work/
+# screenshot intermediates (the 01..06 step PNGs are committed; these are not)
+screenshots/_panels/
+screenshots/00-*.png
+*.db

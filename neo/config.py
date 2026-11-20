@@ -22,8 +22,8 @@ RED_SWARM_EXTRA = [
 BLUE_FIXER = "openai/gpt-5.3-codex"
 
 # Two-vendor PR review. Each reviewer re-runs its claim before posting.
-REVIEWER_SECURITY = "openai/gpt-6.2-sol"     # OpenAI
-REVIEWER_CORRECTNESS = "claude-haiku-5-5"    # Anthropic
+REVIEWER_SECURITY = "openai/gpt-6.2-sol"      # OpenAI
+REVIEWER_CORRECTNESS = "claude-sonnet-5-5"    # Anthropic (SOTA; sonnet 5.5 per João 2026-11-20)
 
 # The agentic chat / orchestrator narration (frontier, cheap).
 CHAT_MODEL = "gpt-6-luna"
