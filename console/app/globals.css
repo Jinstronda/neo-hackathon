@@ -57,7 +57,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .empty { display: grid; place-items: center; gap: 4px; padding: 40px 16px; color: var(--muted); text-align: center; font-size: var(--t-13); }
 .empty strong { color: var(--fg); font-weight: 500; font-size: var(--t-14); }
 .skel { height: 14px; border-radius: 4px; background: var(--active); animation: pulse 1.4s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .45; } }
+@keyframes pulse { 50% { opacity: .7; } }
 
 /* overview */
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px; align-items: start; }

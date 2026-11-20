@@ -38,7 +38,7 @@ export function Shell({ children }: { children: ReactNode }) {
           })}
         </nav>
       </header>
-      <main className="main">{children}{sha && <footer className="foot mono">{sha}</footer>}</main>
+      <main className="main" tabIndex={-1}>{children}{sha && <footer className="foot mono">{sha}</footer>}</main>
     </div>
   );
 }

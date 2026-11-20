@@ -73,7 +73,7 @@ export function EventLog() {
     <section className="card" aria-label="Event stream">
       <div className="card-h">Event stream<span className="end num">{seen.length || ''}</span></div>
       {seen.length ? (
-        <div className="log" role="log" aria-live="polite" ref={log}>
+        <div className="log" role="log" aria-live="polite" tabIndex={0} ref={log}>
           {seen.map((e, i) => (
             <motion.div key={i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}>
               <span className="t num">{clock(e.ts)}</span>

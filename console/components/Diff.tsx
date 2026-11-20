@@ -16,7 +16,7 @@ export function Diff({ diff }: { diff: string }) {
     return () => { live = false; };
   }, [diff]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <pre className="code diff" aria-label="Patch diff">
+    <pre className="code diff" aria-label="Patch diff" tabIndex={0}>
       {lines.map((line, i) => (
         <div key={i} className={tone(line)}>
           {meta(line) || !tokens?.[i] ? line || ' ' : <><span className="gutter">{line[0]}</span>{tokens[i].map((t, j) => <span key={j} style={{ color: t.color }}>{t.content}</span>)}</>}
