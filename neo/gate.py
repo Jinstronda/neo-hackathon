@@ -6,17 +6,27 @@ AND both reviewers approve the exact diff. This module never merges: it emits a
 merge_ready marker for a human, who merges on GitHub.
 """
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
+
+from infra import replay
 
 from . import factory
 from .harness import scenarios, target
-from infra import replay
 
 REPO = Path(__file__).resolve().parent.parent
 DOCKERFILE = REPO / "infra" / "Dockerfile"
+
+# Set in the environment of the pytest that run_tests spawns. Tests that drive the
+# loop skip under it, so the gate never re-runs the loop that called it. A gate
+# that is itself inside a gate run runs only the static regression suites.
+NESTED_ENV = "NEO_GATE_PYTEST"
+REGRESSION_SUITES = ["tests/test_prepatch.py", "tests/test_postpatch.py"]
 
 
 def _route(journal, finding_id=None):
@@ -36,27 +46,34 @@ def _route(journal, finding_id=None):
 
 def _harness_retest(context, phase, journal, finding_id):
     """Docker-free fallback: boot the patched app directly, replay each reference
-    exploit, decide from the same server-side checks. Same verdict, no isolation."""
+    exploit, decide from the same server-side checks. Same verdict, no isolation.
+    Every replay gets a fresh state dir: the app appends to its event log, so a
+    reused dir would let an older run's events decide this one."""
     app = Path(context) / "app.py"
     twin_id = "twin-proc-" + app.parent.name
     if journal:
         journal.emit("twin_deploy", twin_id=twin_id, where="local-process",
                      image="python-app", finding_id=finding_id, phase=phase)
-    results = []
-    for s in scenarios.ALL:
-        state = REPO / "runs" / "tmp" / "gate" / phase / s.name
-        with target.session(state, app_path=app) as tgt:
-            s.exploit(tgt)
-        v = scenarios.get(s.name).check(str(state))
-        done = bool(v.get("objective_complete"))
-        results.append({"check": s.name, "scenario": s.name, "objective_complete": done})
-        if journal:
-            journal.emit("flag_check", finding_id=s.name, scenario=s.name, phase=phase,
-                         objective_complete=done, evidence=v.get("evidence", []))
-            journal.emit("retest", finding_id=s.name, scenario=s.name, phase=phase,
-                         objective_complete=done, status="red" if done else "green")
+    root = Path(tempfile.mkdtemp(prefix=f"neo-gate-{phase}-"))
+    try:
+        results = [_replay_one(s, app, root / s.name, phase, journal) for s in scenarios.ALL]
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
     any_complete = any(r["objective_complete"] for r in results)
     return results, (not any_complete if phase == "post-patch" else any_complete)
+
+
+def _replay_one(s, app, state, phase, journal):
+    with target.session(state, app_path=app) as tgt:
+        s.exploit(tgt)
+    v = s.check(str(state))
+    done = bool(v.get("objective_complete"))
+    if journal:
+        journal.emit("flag_check", finding_id=s.name, scenario=s.name, phase=phase,
+                     objective_complete=done, evidence=v.get("evidence", []))
+        journal.emit("retest", finding_id=s.name, scenario=s.name, phase=phase,
+                     objective_complete=done, status="red" if done else "green")
+    return {"check": s.name, "scenario": s.name, "objective_complete": done}
 
 
 def retest(context, *, phase, journal=None, finding_id=None):
@@ -72,14 +89,22 @@ def retest(context, *, phase, journal=None, finding_id=None):
         return _harness_retest(context, phase, journal, finding_id)
 
 
-def run_tests(journal=None, *, regression_added=0):
-    """Run the pytest suite (the permanent regression + attack-replay tests)."""
-    proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "tests"],
-                          cwd=REPO, capture_output=True, text=True)
+def _count(out, word):
+    m = re.search(rf"(\d+) {word}", out)
+    return int(m.group(1)) if m else 0
+
+
+def run_tests(journal=None, *, regression_added: int = 0) -> tuple[bool, int, int]:
+    """Run the pytest suite (the permanent regression + attack-replay tests). The
+    child runs with NESTED_ENV set, so a test that drives the loop never recurses."""
+    nested = bool(os.environ.get(NESTED_ENV))
+    suites = REGRESSION_SUITES if nested else ["tests"]
+    proc = subprocess.run([sys.executable, "-m", "pytest", "-q", *suites],
+                          cwd=REPO, capture_output=True, text=True,
+                          env={**os.environ, NESTED_ENV: "1"})
     out = proc.stdout + proc.stderr
-    m = re.search(r"(\d+) passed", out)
-    passed = int(m.group(1)) if m else 0
-    failed = int((re.search(r"(\d+) failed", out) or [0, 0])[1]) if "failed" in out else 0
+    passed = _count(out, "passed")
+    failed = _count(out, "failed") + _count(out, "error")
     total = passed + failed
     ok = proc.returncode == 0 and failed == 0
     if journal:
@@ -103,10 +128,8 @@ def readiness(pr, retest_green, tests_pass, verdicts, *, journal=None):
 
 
 def demo():
-    import tempfile
-
-    from .journal import Journal
     from . import blue
+    from .journal import Journal
 
     tmp = Path(tempfile.mkdtemp())
     j = Journal(tmp / "run")

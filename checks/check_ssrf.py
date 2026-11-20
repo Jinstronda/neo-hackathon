@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _events import of, read  # noqa: E402
 
 
-def check(state_dir):
+def check(state_dir) -> dict:
     events = read(state_dir)
     internal = of(events, "internal_fetch")
     key_used = of(events, "admin_key_used")

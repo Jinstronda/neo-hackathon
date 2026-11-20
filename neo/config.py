@@ -1,31 +1,51 @@
-"""NEO model map and gateway config. Ids confirmed against the HomoDeus LLM
-gateway /v1/models on 2026-11-20. Never hardcode a key here; read the env."""
+"""NEO model map and gateway config. Everything comes from the env, and .env is
+loaded here at import, so any entry point sees the same values.
+
+The red swarm ids live only in the untracked .env (NEO_RED_SWARM), never in this
+public file; UI and logs show them as model-1..model-n. Blue, reviewer and chat
+ids were confirmed against the gateway's /v1/models on 2026-11-20 and can be
+overridden from the env. Never hardcode a key or a gateway host here."""
 import os
 
-GATEWAY_BASE = os.environ.get("NEO_GATEWAY_BASE", "https://mcp.homodeus.co/llm/v1")
+from . import env
+
+env.load()
+
+
+def _ids(name: str) -> list[str]:
+    return [m.strip() for m in os.environ.get(name, "").split(",") if m.strip()]
+
+
+GATEWAY_BASE = os.environ.get("NEO_GATEWAY_BASE") or "https://mcp.homodeus.co/llm/v1"
 API_KEY_ENV = "HOMODEUS_API_KEY"
 
-# The offensive side. Open-weight models that run on our own EU servers.
-# In public UI/README these are described, never named individually.
-RED_SWARM = [
-    "refuseless/glm-5.3-abliterated",
-    "refuseless/deepseek-v4.1-flash-abliterated",
-    "refuseless/minimax-m3.1-flash",
-]
-# Extra engines if more breadth is wanted (up to five, per the design).
-RED_SWARM_EXTRA = [
-    "refuseless/kimi-k3.1-pro-abliterated",
-    "refuseless/glm-5.3-flash-abliterated",
-]
+# The offensive side: open-weight models running on our own EU servers.
+RED_SWARM = _ids("NEO_RED_SWARM")
+# Extra engines for a wider swarm (up to five in total, per the design).
+RED_SWARM_EXTRA = _ids("NEO_RED_SWARM_EXTRA")
 
 # The blue side writes the fix.
-BLUE_FIXER = "openai/gpt-5.3-codex"
+BLUE_FIXER = os.environ.get("NEO_BLUE_FIXER") or "openai/gpt-5.3-codex"
 
-# Two-vendor PR review. Each reviewer re-runs its claim before posting.
-REVIEWER_SECURITY = "openai/gpt-6.2-sol"      # OpenAI
-REVIEWER_CORRECTNESS = "claude-sonnet-5-5"    # Anthropic (SOTA; sonnet 5.5 per João 2026-11-20)
+# Two-vendor review of the exact diff. Each reviewer re-runs its claim before posting.
+REVIEWER_SECURITY = os.environ.get("NEO_REVIEWER_SECURITY") or "openai/gpt-6.2-sol"
+REVIEWER_CORRECTNESS = os.environ.get("NEO_REVIEWER_CORRECTNESS") or "claude-sonnet-5-5"
 
-# The agentic chat / orchestrator narration (frontier, cheap).
-CHAT_MODEL = "gpt-6-luna"
+# The terminal agent and the loop narration.
+CHAT_MODEL = os.environ.get("NEO_CHAT_MODEL") or "gpt-6-luna"
+
+# Where the fix PR opens; `neo run --local` and `neo watch --local` skip GitHub.
+GITHUB_REPO = os.environ.get("NEO_REPO") or "Jinstronda/neo-hackathon"
 
 PROJECT_HEADER = "neo-hackathon"
+
+SWARM_UNSET = ("NEO_RED_SWARM is empty. Set it in .env to a comma-separated list of "
+               "red model ids (see .env.example).")
+
+
+def swarm(n: int | None = None) -> list[str]:
+    """The first n red models, primary swarm first, then the extras. None means the
+    whole primary swarm. Raises with one clear message when NEO_RED_SWARM is unset."""
+    if not RED_SWARM:
+        raise RuntimeError(SWARM_UNSET)
+    return (RED_SWARM + RED_SWARM_EXTRA)[:n] if n else list(RED_SWARM)

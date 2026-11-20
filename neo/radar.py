@@ -9,8 +9,13 @@ to the red swarm.
   OSV      osv.dev advisories for the exact package+version.
 
 Rank: in KEV first, then by EPSS, then "reachable" (a direct dependency). A CVE
-is not a finding — this is a worklist. Proof comes later, when the exploit fires
+is not a finding; this is a worklist. Proof comes later, when the exploit fires
 on the twin and dies on the patch.
+
+Methodology: neo/skills/cve-intake/SKILL.md (radar is read-only and never
+contacts a target; the triage gates and local-repro rules gate adoption into a
+run). Feeds the red swarm, which scores every finding through
+neo/skills/adversary-review/SKILL.md.
 
 stdlib only; every call goes out read-only, nothing touches a target.
 """
@@ -31,24 +36,19 @@ EPSS_URL = "https://api.first.org/data/v1/epss?cve={cve}"
 OSV_URL = "https://api.osv.dev/v1/query"
 
 
-def _get_json(url, timeout=15):
-    req = urllib.request.Request(url, headers={"User-Agent": "neo-radar"})
+def _fetch_json(url, body=None, timeout=15):
+    """GET url, or POST body as JSON when one is given, and parse the reply."""
+    headers = {"User-Agent": "neo-radar"}
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read())
 
 
-def _post_json(url, body, timeout=15):
-    req = urllib.request.Request(
-        url, data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "User-Agent": "neo-radar"},
-        method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
-
-
-# ----------------------------------------------------------------------- SBOM
-
-def build_sbom(target=TARGET):
+def build_sbom(target: Path = TARGET) -> list[dict]:
     """[{name, version, ecosystem, direct}]. Syft if present, else requirements.txt."""
     comps = _syft_sbom(target)
     if comps:
@@ -106,13 +106,11 @@ def _osv_ecosystem(syft_type):
             "go-module": "Go"}.get(syft_type, "PyPI")
 
 
-# ----------------------------------------------------------------------- feeds
-
-def load_kev():
+def load_kev() -> tuple[set[str], str]:
     """Set of CVE ids in the live CISA KEV feed, merged with the staged entry."""
     ids, source = set(), "staged-only"
     try:
-        live = _get_json(KEV_URL, timeout=20)
+        live = _fetch_json(KEV_URL, timeout=20)
         ids = {v["cveID"] for v in live.get("vulnerabilities", [])}
         source = f"live({len(ids)})+staged"
     except (urllib.error.URLError, OSError, KeyError) as e:
@@ -123,10 +121,10 @@ def load_kev():
     return ids, source
 
 
-def osv_vulns(comp):
+def osv_vulns(comp: dict) -> list[dict]:
     """OSV advisory ids for one component+version."""
     try:
-        res = _post_json(OSV_URL, {
+        res = _fetch_json(OSV_URL, {
             "package": {"name": comp["name"], "ecosystem": comp["ecosystem"]},
             "version": comp["version"]})
     except (urllib.error.URLError, OSError):
@@ -140,20 +138,20 @@ def osv_vulns(comp):
     return out
 
 
-def epss(cve):
+def epss(cve: str | None) -> float:
+    """First.org EPSS probability for one CVE; 0.0 when unknown or unreachable."""
     if not cve:
         return 0.0
     try:
-        res = _get_json(EPSS_URL.format(cve=cve), timeout=10)
+        res = _fetch_json(EPSS_URL.format(cve=cve), timeout=10)
     except (urllib.error.URLError, OSError):
         return 0.0
     data = res.get("data") or []
     return float(data[0]["epss"]) if data else 0.0
 
 
-# ----------------------------------------------------------------------- match
-
-def scan(target=TARGET):
+def scan(target: Path = TARGET) -> dict:
+    """SBOM x KEV x EPSS x OSV, ranked. {sbom_size, kev_source, matches}."""
     sbom = build_sbom(target)
     kev_ids, kev_source = load_kev()
     matches, seen = [], {}
@@ -183,7 +181,7 @@ def scan(target=TARGET):
     return {"sbom_size": len(sbom), "kev_source": kev_source, "matches": matches}
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="NEO exploit radar")
     p.add_argument("--target", default=str(TARGET))
     p.add_argument("--json", action="store_true", help="machine-readable output only")
@@ -196,7 +194,8 @@ def main(argv=None):
         print(json.dumps(result, indent=2))
     else:
         print(f"SBOM: {result['sbom_size']} components   KEV: {result['kev_source']}")
-        print(f"{'KEV':>3} {'EPSS':>7}  {'reach':>5}  {'package':<12} {'version':<8} {'CVE':<16} OSV")
+        print(f"{'KEV':>3} {'EPSS':>7}  {'reach':>5}  {'package':<12} {'version':<8} "
+              f"{'CVE':<16} OSV")
         for m in result["matches"]:
             print(f"{'yes' if m['kev'] else ' no':>3} {m['epss']:>7.3f}  "
                   f"{'yes' if m['reachable'] else ' no':>5}  {m['package']:<12} "

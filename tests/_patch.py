@@ -2,6 +2,7 @@
 post-patch tests boot the result and prove every exploit dies. Each anchor must
 match the live app.py, so this doubles as a check that FIXES.md stays accurate:
 a drifted anchor raises here instead of silently skipping the fix."""
+import shutil
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -41,7 +42,7 @@ FIXES = [
 ]
 
 
-def apply(src=None):
+def apply(src: str | None = None) -> str:
     text = src if src is not None else APP.read_text()
     for label, before, after in FIXES:
         if before not in text:
@@ -50,11 +51,9 @@ def apply(src=None):
     return text
 
 
-def write_patched(dest_dir):
+def write_patched(dest_dir) -> Path:
     """Copy the demo target into dest_dir with the fixes applied; return app path."""
-    import shutil
-    src = APP.parent
-    shutil.copytree(src, dest_dir, dirs_exist_ok=True)
+    shutil.copytree(APP.parent, dest_dir, dirs_exist_ok=True)
     app = Path(dest_dir) / "app.py"
     app.write_text(apply(app.read_text()))
     return app

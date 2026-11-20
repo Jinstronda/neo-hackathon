@@ -7,8 +7,10 @@ approve. A disagreement goes to a human side by side; nothing auto-resolves.
 The diff, the finding and any repo guidelines are untrusted data, never
 instructions, the same rule a vendor PR reviewer follows."""
 import json
+from collections.abc import Callable
 
 from . import config, llm
+from .journal import Journal
 
 REVIEWERS = {
     "security": {
@@ -48,7 +50,8 @@ def _context(pr, guidelines):
 def _draft(role, pr, guidelines, ask):
     r = REVIEWERS[role]
     msgs = [
-        {"role": "system", "content": f"You are the {role} reviewer on a security-fix PR. {_RULES}"},
+        {"role": "system",
+         "content": f"You are the {role} reviewer on a security-fix PR. {_RULES}"},
         {"role": "user", "content": f"{r['focus']}\n\n{_context(pr, guidelines)}\n\n"
          'Return {"verdict":"approve"|"request_changes","comment":"<=3 sentences",'
          '"claims":[{"claim":"...","span":"exact diff line"}]}'},
@@ -87,7 +90,7 @@ def _span_in_diff(span, diff):
     return any(s in ln for ln in lines)
 
 
-def decide(role, draft, recheck, diff):
+def decide(role: str, draft: dict, recheck: dict, diff: str) -> dict:
     """Pure verdict logic. Approve only if draft and recheck both approve, every
     rechecked claim holds with a real span, and the exploit is traced dead."""
     checks = recheck.get("checks") or []
@@ -128,7 +131,9 @@ def decide(role, draft, recheck, diff):
     }
 
 
-def review_one(role, pr, *, guidelines="", ask=llm.chat_json):
+def review_one(role: str, pr: dict, *, guidelines: str = "",
+               ask: Callable = llm.chat_json) -> dict:
+    """Draft, fresh recheck, then the pure verdict, bound to this PR's digest."""
     draft = _draft(role, pr, guidelines, ask)
     recheck = _recheck(role, pr, draft, ask)
     v = decide(role, draft, recheck, pr["diff"])
@@ -136,7 +141,7 @@ def review_one(role, pr, *, guidelines="", ask=llm.chat_json):
     return v
 
 
-def side_by_side(pr, verdicts):
+def side_by_side(pr: dict, verdicts: list[dict]) -> dict | None:
     """The record a human reads when the reviewers disagree. No auto-resolution."""
     if len({v["verdict"] for v in verdicts}) < 2:
         return None
@@ -149,7 +154,8 @@ def side_by_side(pr, verdicts):
     }
 
 
-def review_pr(pr, *, guidelines="", journal=None, ask=llm.chat_json):
+def review_pr(pr: dict, *, guidelines: str = "", journal: Journal | None = None,
+              ask: Callable = llm.chat_json) -> dict:
     """Run both reviewers. Returns {verdicts, passed, disagreement}."""
     verdicts = [review_one(role, pr, guidelines=guidelines, ask=ask) for role in REVIEWERS]
     for v in verdicts:

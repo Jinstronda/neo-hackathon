@@ -4,8 +4,11 @@ import { num, text, type Agent, type Metrics, type RunEvent, type RunSummary } f
 // a step with no event stays pending, an agent with no event stays idle.
 export type TimelineRow = { key: string; label: string; at: number | null; detail: string; tone: 'red' | 'green' | 'plain' };
 export type Finding = { id: string; model: string; cls: string; location: string; request: string; response: string; confirmedBy: string; at: number };
+export type AgentStatus = 'idle' | 'working' | 'done';
+export type AgentTrace = { ts: number; label: string; tone?: 'red' | 'green' };
+export type AgentView = Agent & { activity: string; busy: boolean; sub: string; status: AgentStatus; trace: AgentTrace[] };
 export type View = {
-  agents: (Agent & { activity: string; busy: boolean })[];
+  agents: AgentView[];
   timeline: TimelineRow[];
   findings: Finding[];
   pre?: RunEvent; post?: RunEvent; patch?: RunEvent; reviews: RunEvent[]; tests?: RunEvent; merge?: RunEvent; mergeReady?: RunEvent; started?: RunEvent;
@@ -53,22 +56,37 @@ export function view(run: RunSummary, events: RunEvent[]): View {
     row('retest', 'Retest', post, post ? (postDead ? 'Same exploit, objective not reached' : 'Exploit still works') : '', post ? (postDead ? 'green' : 'red') : 'plain'),
     row('verified', 'Verified', tests && postDead ? tests : undefined, tests ? `${num(tests.passed)}/${num(tests.total)} tests, ${num(tests.regression_added)} regression added` : '', 'green'),
   ];
-  const agents = run.agents.map((agent) => {
-    let activity = 'Idle', busy = false;
+  // Per-agent trace: every line is a real event this agent produced, never invented.
+  const rebuiltPost = rebuilt; // twin_deploy, post-patch
+  const agents: AgentView[] = run.agents.map((agent) => {
+    const trace: AgentTrace[] = [];
+    let status: AgentStatus = 'idle', sub = '';
     if (agent.role === 'red') {
-      const own = [...events].reverse().find((e) => e.type === 'red_finding' && e.model === agent.label);
+      sub = 'open-weight · EU';
+      if (started) trace.push({ ts: started.ts, label: `Attacking ${text(started.twin_id)}` });
       const mine = events.filter((e) => e.type === 'red_finding' && (e.model === agent.label || (Array.isArray(e.found_by) && e.found_by.includes(agent.label))));
-      if (mine.length > 1) activity = `Found ${mine.length}: ${mine.map((e) => text(e.cls)).join(', ')}`;
-      else if (own) activity = `Found ${text(own.cls).toLowerCase()} at ${text(own.location)}`;
-      else if (started) { activity = pre ? 'Swept, no new finding' : 'Attacking the twin'; busy = !pre; }
+      mine.forEach((e) => trace.push({ ts: e.ts, label: `Found ${text(e.cls)} at ${text(e.location)}`, tone: 'red' }));
+      if (pre && mine.length) trace.push({ ts: pre.ts, label: 'Server flag check confirmed it', tone: 'red' });
+      status = mine.length ? 'done' : started ? (pre ? 'done' : 'working') : 'idle';
     } else if (agent.role === 'blue') {
-      if (patch) activity = patch.pr_number ? `Opened PR #${text(patch.pr_number)}` : `Patched ${text(patch.branch)}`;
+      sub = 'blue team';
+      if (patch) trace.push({ ts: patch.ts, label: patch.pr_number ? `Opened PR #${text(patch.pr_number)} (${text(patch.branch)})` : `Patched ${text(patch.branch)}` });
+      if (rebuiltPost) trace.push({ ts: rebuiltPost.ts, label: `Rebuilt ${text(rebuiltPost.twin_id)}` });
+      if (post && postDead) trace.push({ ts: post.ts, label: 'Replayed the exploit: objective not reached', tone: 'green' });
+      status = patch ? 'done' : pre ? 'working' : 'idle';
     } else {
       const own = reviews.find((r) => r.reviewer === agent.label);
-      if (own) activity = own.verdict === 'approve' ? 'Approved after re-running the exploit' : 'Requested changes after re-running the exploit';
-      else if (patch) { activity = 'Reviewing the diff'; busy = true; }
+      sub = own?.vendor ? text(own.vendor) : agent.label === 'security' ? 'security reviewer' : 'correctness reviewer';
+      if (own) {
+        trace.push({ ts: own.ts, label: own.verdict === 'approve' ? 'Approved' : 'Requested changes', tone: own.verdict === 'approve' ? 'green' : 'red' });
+        trace.push({ ts: own.ts, label: own.rechecked === true || own.rechecked === 'True' ? 'Re-checked the diff before posting' : text(own.comment).slice(0, 80) });
+      }
+      status = own ? 'done' : patch ? 'working' : 'idle';
     }
-    return { ...agent, activity, busy };
+    trace.sort((a, b) => a.ts - b.ts);
+    const busy = status === 'working';
+    const activity = trace.length ? trace[trace.length - 1].label : status === 'working' ? 'Working' : 'Idle';
+    return { ...agent, sub, status, trace, busy, activity };
   });
   const metrics: Partial<Metrics> = metricsEvent ? {
     minutes_exploit_to_fix: num(metricsEvent.minutes_exploit_to_fix), cost_usd: num(metricsEvent.cost_usd), where: text(metricsEvent.where),

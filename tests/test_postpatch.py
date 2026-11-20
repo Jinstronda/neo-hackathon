@@ -1,10 +1,9 @@
 """Regression, post-patch: with the documented fixes applied to a copy of the
 target, the same reference exploit is dead for every scenario. This is the merge
-gate encoded as a test — a fixed bug can never come back silently, and FIXES.md
+gate encoded as a test: a fixed bug can never come back silently, and FIXES.md
 is proven to actually close each class."""
-import pytest
-
 import _patch
+import pytest
 from conftest import exploit_and_check
 
 

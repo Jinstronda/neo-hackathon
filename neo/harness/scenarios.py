@@ -4,9 +4,9 @@ check that reads only the run's event log, a reference exploit that proves the
 chain stays solvable, and the ground truth used to score an agent's report."""
 import importlib.util
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 REPO = Path(__file__).resolve().parents[2]
 CHECKS = REPO / "checks"
@@ -98,7 +98,7 @@ ALL = [
 BY_NAME = {s.name: s for s in ALL}
 
 
-def get(name):
+def get(name: str) -> Scenario:
     if name not in BY_NAME:
         raise KeyError(f"no scenario {name!r}; have {list(BY_NAME)}")
     return BY_NAME[name]

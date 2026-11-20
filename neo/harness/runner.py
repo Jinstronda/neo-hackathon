@@ -8,8 +8,10 @@ import re
 import secrets
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
+from ..journal import Journal
 from . import agent as agent_mod
 from . import scenarios, target
 
@@ -17,7 +19,6 @@ REPO = Path(__file__).resolve().parents[2]
 RUNS = REPO / "runs" / "tmp"   # gitignored; engine passes its own run_root for real runs
 
 
-# ------------------------------------------------------------------- scoring
 def _tokens(text):
     return {t for t in re.split(r"[^a-z0-9]+", (text or "").lower()) if len(t) > 2}
 
@@ -31,7 +32,8 @@ def _match(finding, truth):
     return class_ok and loc_ok
 
 
-def score(findings, truth):
+def score(findings: list[dict], truth: list[dict]) -> tuple[list, list, list]:
+    """Greedy one-to-one match of reported findings to ground truth: (matched, missed, fps)."""
     matched, used = [], set()
     for f in findings:
         for i, t in enumerate(truth):
@@ -44,8 +46,9 @@ def score(findings, truth):
     return matched, missed, fps
 
 
-# ------------------------------------------------------------------- run
-def run_scenario(scenario, agent_fn, *, run_root=None, journal=None, models_label=None):
+def run_scenario(scenario: scenarios.Scenario, agent_fn: Callable, *, run_root=None,
+                 journal: Journal | None = None, models_label: list[str] | None = None) -> dict:
+    """One scored run; writes report.json and metrics.json under run_root."""
     run_root = Path(run_root or RUNS / scenario.name / time.strftime("%Y%m%d-%H%M%S"))
     state_dir = run_root / "state"
     run_root.mkdir(parents=True, exist_ok=True)
@@ -63,9 +66,10 @@ def run_scenario(scenario, agent_fn, *, run_root=None, journal=None, models_labe
     matched, missed, fps = score(report.get("findings", []), scenario.ground_truth)
 
     if journal:
+        model = (models_label or ["model-1"])[0]
         for m in matched:
             f = m["agent"]
-            journal.emit("red_finding", finding_id=m["truth"], model=(models_label or ["model-1"])[0],
+            journal.emit("red_finding", finding_id=m["truth"], model=model,
                          cls=f.get("class"), location=f.get("location"),
                          request=scenario.brief, response=f.get("evidence"),
                          confirmed_by="server-side flag check")
@@ -106,7 +110,7 @@ def _print(m):
           f"time={m['wallclock_s']}s")
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="NEO scenario harness")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")

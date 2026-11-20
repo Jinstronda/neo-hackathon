@@ -30,7 +30,7 @@ def _last_result(output):
     return {}
 
 
-def objective_complete(flag, exploit_name, output):
+def objective_complete(flag: str, exploit_name: str, output: str) -> bool:
     r = _last_result(output)
     if "sqli" in exploit_name:
         return r.get("role") == "admin"          # server-decided role

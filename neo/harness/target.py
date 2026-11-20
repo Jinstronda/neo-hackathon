@@ -6,12 +6,14 @@ loopback aliasing or elevated capability (that is only for the Docker twin).
 Success is decided from the state dir's server-side event log, never from the
 agent, so each run gets its own dir and its own secret flag."""
 import contextlib
+import os
 import socket
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -20,7 +22,7 @@ APP = REPO / "demo-target" / "app.py"
 ROLE = "neo-demo-role"  # demo-target/config.yaml iam_role_name
 
 
-def free_port():
+def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
@@ -47,7 +49,7 @@ def _healthy(base_url, timeout=15):
     return False
 
 
-def boot(state_dir, app_path=APP):
+def boot(state_dir: str | Path, app_path: Path = APP) -> Target:
     """Start the target. Caller owns stop(target) (or use session()).
 
     app_path lets the post-patch tests boot a fixed copy of the app."""
@@ -58,7 +60,7 @@ def boot(state_dir, app_path=APP):
         "NEO_WEB_HOST": "127.0.0.1", "NEO_WEB_PORT": str(web),
         "NEO_META_HOST": "127.0.0.1", "NEO_META_PORT": str(meta),
         "NEO_STATE": str(state_dir),
-        "PATH": __import__("os").environ.get("PATH", ""),
+        "PATH": os.environ.get("PATH", ""),
     }
     proc = subprocess.Popen([sys.executable, str(app_path)], env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
@@ -71,7 +73,7 @@ def boot(state_dir, app_path=APP):
     return Target(base_url, meta_url, state_dir, proc)
 
 
-def stop(target):
+def stop(target: Target) -> None:
     with contextlib.suppress(ProcessLookupError, OSError):
         target.proc.terminate()
     with contextlib.suppress(subprocess.TimeoutExpired):
@@ -82,7 +84,8 @@ def stop(target):
 
 
 @contextlib.contextmanager
-def session(state_dir, app_path=APP):
+def session(state_dir: str | Path, app_path: Path = APP) -> Iterator[Target]:
+    """boot() then stop(), even when the attack raises."""
     t = boot(state_dir, app_path=app_path)
     try:
         yield t

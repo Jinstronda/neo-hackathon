@@ -41,11 +41,11 @@ def _load_checks(checks_dir):
     return out
 
 
-def find_exploits(context):
+def find_exploits(context) -> list[str]:
     return sorted(glob.glob(str(Path(context) / "exploit_*.py")))
 
 
-def run_exploit(script, base_url, timeout=90):
+def run_exploit(script: str, base_url: str, timeout: float = 90) -> tuple[str, int]:
     """Run one exploit against the twin so the app logs events. The output is
     kept as evidence only; it does not decide the gate."""
     try:
@@ -61,7 +61,7 @@ def run_exploit(script, base_url, timeout=90):
 
 def replay(context=DEFAULT_CONTEXT, checks=DEFAULT_CHECKS, phase="post-patch",
            health=twin_local.DEFAULT_HEALTH, container_port=twin_local.DEFAULT_PORT,
-           dockerfile=twin_local.DEFAULT_DOCKERFILE, emit=print):
+           dockerfile=twin_local.DEFAULT_DOCKERFILE, emit=print) -> tuple[list[dict], bool]:
     """Build a fresh twin, replay all exploits, verdict from the event log.
     Returns (results, gate_pass)."""
     exploits = find_exploits(context)
@@ -114,7 +114,7 @@ def replay(context=DEFAULT_CONTEXT, checks=DEFAULT_CHECKS, phase="post-patch",
     return results, gate_pass
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="NEO exploit replay / retest gate")
     p.add_argument("--context", default=str(DEFAULT_CONTEXT))
     p.add_argument("--checks", default=str(DEFAULT_CHECKS))

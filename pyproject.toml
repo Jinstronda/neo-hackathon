@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neo"
+version = "0.1.0"
+description = "An AI red and blue team that proves every exploit and every fix on a disposable twin before a human merges."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+remote = ["paramiko>=3.4"]
+dev = ["pytest>=8", "ruff>=0.8"]
+
+[project.scripts]
+neo = "neo.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/Jinstronda/neo-hackathon"
+
+[tool.setuptools.packages.find]
+include = ["neo", "neo.*", "infra", "checks"]
+namespaces = false
+
+[tool.setuptools.package-data]
+neo = ["skills/**/*.md", "prompts/*.md", "fixtures/*.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["demo-target", "console", "qa", "runs", "screenshots", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -36,17 +36,19 @@ def _run(cmd, **kw):
     return subprocess.run(cmd, capture_output=True, text=True, check=True, **kw)
 
 
-def free_port():
+def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
 
 
-def new_flag():
+def new_flag() -> str:
     return "FLAG{" + secrets.token_hex(16) + "}"
 
 
-def build_image(context=DEFAULT_CONTEXT, tag=None, dockerfile=DEFAULT_DOCKERFILE):
+def build_image(context=DEFAULT_CONTEXT, tag: str | None = None,
+                dockerfile=DEFAULT_DOCKERFILE) -> str:
+    """docker build the context with infra/Dockerfile; returns the image tag."""
     context = Path(context)
     dockerfile = Path(dockerfile)
     if not dockerfile.exists():
@@ -70,7 +72,7 @@ class Twin:
         return {"twin_id": self.id, "where": where, "image": self.image}
 
 
-def boot(image, *, container_port=DEFAULT_PORT, env=None):
+def boot(image: str, *, container_port: int = DEFAULT_PORT, env: dict | None = None) -> Twin:
     """Start a disposable twin with its own mounted state dir. NET_ADMIN lets the
     entrypoint alias the metadata IP onto lo (SSRF chain); without it the app
     degrades to a loopback metadata service."""
@@ -89,7 +91,7 @@ def boot(image, *, container_port=DEFAULT_PORT, env=None):
     return Twin(twin_id, container, f"http://127.0.0.1:{port}", image, state_dir, new_flag())
 
 
-def wait_health(base_url, path=DEFAULT_HEALTH, timeout=40):
+def wait_health(base_url: str, path: str = DEFAULT_HEALTH, timeout: float = 40) -> int:
     """Poll until the health endpoint answers 2xx, or raise on timeout."""
     url = base_url.rstrip("/") + "/" + path.lstrip("/")
     deadline = time.time() + timeout
@@ -105,7 +107,8 @@ def wait_health(base_url, path=DEFAULT_HEALTH, timeout=40):
     raise TimeoutError(f"{url} not healthy in {timeout}s (last: {last})")
 
 
-def teardown(twin):
+def teardown(twin: Twin | str) -> None:
+    """Remove the container (and the state dir, given a Twin). Safe to call twice."""
     if isinstance(twin, Twin):
         subprocess.run(["docker", "rm", "-f", twin.container], capture_output=True, text=True)
         shutil.rmtree(twin.state_dir, ignore_errors=True)
@@ -113,8 +116,8 @@ def teardown(twin):
         subprocess.run(["docker", "rm", "-f", twin], capture_output=True, text=True)
 
 
-def up(context=DEFAULT_CONTEXT, *, health=DEFAULT_HEALTH, container_port=DEFAULT_PORT,
-       dockerfile=DEFAULT_DOCKERFILE):
+def up(context=DEFAULT_CONTEXT, *, health: str = DEFAULT_HEALTH,
+       container_port: int = DEFAULT_PORT, dockerfile=DEFAULT_DOCKERFILE) -> Twin:
     """Build + boot + wait. Caller owns teardown(twin)."""
     image = build_image(context, dockerfile=dockerfile)
     twin = boot(image, container_port=container_port)
@@ -138,7 +141,7 @@ def _selftest(args):
             print(f"tore down {twin.id}", file=sys.stderr)
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="NEO local twin")
     p.add_argument("--context", default=str(DEFAULT_CONTEXT),
                    help="build context (demo-target)")

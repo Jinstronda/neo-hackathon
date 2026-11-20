@@ -8,12 +8,21 @@ Public UI shows the models as model-1..model-n; their names stay in config. The
 reasoning (plan, judge) runs on the open-weight models through neo/llm.py; the
 attack itself is a vetted reference primitive, so a model reasons about the
 target but cannot run arbitrary code against it.
+
+Methodology this enforces:
+  neo/skills/breachbench/SKILL.md     server-side evidence decides, not the model;
+                                      a class counts only on confirm or reproduction.
+  neo/skills/adversary-review/SKILL.md grade demonstrated impact, never potential;
+                                      the severity gate before any report line.
 """
 import time
+from collections.abc import Callable
+from pathlib import Path
 
 from . import config
 from .harness import agent as agent_mod
 from .harness import scenarios, target
+from .journal import Journal
 
 # scenario name -> (exploit script, server-side check) for the PR evidence and
 # the permanent regression record.
@@ -41,8 +50,9 @@ def _class_of(report, scenario):
     return hit
 
 
-def prove(scenario, models=None, *, run_root, labels=None, journal=None,
-          agent_factory=agent_mod.swarm_agent):
+def prove(scenario: scenarios.Scenario, models: list[str] | None = None, *, run_root: Path,
+          labels: list[str] | None = None, journal: Journal | None = None,
+          agent_factory: Callable = agent_mod.swarm_agent) -> dict | None:
     """Run every red model against its own fresh target for one scenario. Returns a
     finding dict when the objective is confirmed (server-side, or two models), else
     None. agent_factory(model_list) -> agent_fn lets the self-check inject a
@@ -52,7 +62,7 @@ def prove(scenario, models=None, *, run_root, labels=None, journal=None,
 
     attempts = []  # one per model: who, did the server-side check fire, what it claimed
     server_verdict = None
-    for model, label in zip(models, labels):
+    for model, label in zip(models, labels, strict=True):
         state_dir = run_root / scenario.name / f"{label}-state"
         agent_fn = agent_factory([model])  # this model plans AND judges, in its own context
         fallback = False
@@ -113,8 +123,9 @@ def prove(scenario, models=None, *, run_root, labels=None, journal=None,
     return finding
 
 
-def run(models=None, scenarios_=None, *, run_root, journal=None,
-        agent_factory=agent_mod.swarm_agent):
+def run(models: list[str] | None = None, scenarios_: list[scenarios.Scenario] | None = None, *,
+        run_root: Path, journal: Journal | None = None,
+        agent_factory: Callable = agent_mod.swarm_agent) -> list[dict]:
     """Drive the whole red phase. Emits one red_start, then per scenario a
     red_finding and a pre-patch flag_check. Returns the confirmed findings, which
     blue consumes."""
@@ -135,14 +146,14 @@ def run(models=None, scenarios_=None, *, run_root, journal=None,
 
 def demo():
     import tempfile
-    from pathlib import Path
-
-    from .journal import Journal
 
     tmp = Path(tempfile.mkdtemp())
     j = Journal(tmp / "run")
-    # deterministic driver: ignore the model list, run the vetted reference chain
-    factory = lambda _models: agent_mod.mock_agent  # noqa: E731
+
+    def factory(_models):
+        # deterministic driver: ignore the model list, run the vetted reference chain
+        return agent_mod.mock_agent
+
     findings = run(models=["m-a", "m-b"], run_root=tmp / "state", journal=j,
                    agent_factory=factory)
     assert len(findings) == 3, findings

@@ -9,6 +9,7 @@ line; it never blocks the loop."""
 import argparse
 import io
 import json
+import os
 import secrets
 import sys
 import tarfile
@@ -22,8 +23,8 @@ except ImportError:
     paramiko = None
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from neo import env as neo_env  # noqa: E402
 from infra import twin_local  # noqa: E402
+from neo import env as neo_env  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_CONTEXT = REPO / "demo-target"
@@ -50,7 +51,6 @@ class ServerTwin:
 
 def _creds():
     neo_env.load()
-    import os
     host = os.environ.get("TWIN_SSH_HOST", "").strip()
     user = os.environ.get("TWIN_SSH_USER", "ubuntu").strip()
     pw = os.environ.get("TWIN_SSH_PASS", "").strip()
@@ -59,7 +59,8 @@ def _creds():
     return host, user, pw
 
 
-def connect(timeout=12):
+def connect(timeout: float = 12):
+    """An SSH client logged in to the twin box, or Unavailable."""
     if paramiko is None:
         raise Unavailable("paramiko not installed")
     host, user, pw = _creds()
@@ -79,7 +80,7 @@ def _exec(cli, cmd, timeout=180):
     return code, out.read().decode(errors="replace"), err.read().decode(errors="replace")
 
 
-def ensure_docker(cli):
+def ensure_docker(cli) -> str:
     """Return the docker invocation that works on the box ('docker' or
     'sudo -n docker'), bringing the daemon up if we have sudo. Raise if none."""
     _, out, _ = _exec(cli, "docker info >/dev/null 2>&1 && echo ok || echo no")
@@ -110,8 +111,9 @@ def _tar_context(context, dockerfile=DEFAULT_DOCKERFILE):
     return buf
 
 
-def up_remote(context=DEFAULT_CONTEXT, container_port=twin_local.DEFAULT_PORT,
-              health=twin_local.DEFAULT_HEALTH, dockerfile=DEFAULT_DOCKERFILE):
+def up_remote(context=DEFAULT_CONTEXT, container_port: int = twin_local.DEFAULT_PORT,
+              health: str = twin_local.DEFAULT_HEALTH, dockerfile=DEFAULT_DOCKERFILE) -> tuple:
+    """Build and run the twin on the box. Returns (cli, twin, workdir); caller tears down."""
     context = Path(context)
     if not Path(dockerfile).exists():
         raise Unavailable(f"no Dockerfile at {dockerfile}")
@@ -144,7 +146,7 @@ def up_remote(context=DEFAULT_CONTEXT, container_port=twin_local.DEFAULT_PORT,
         url = base + "/" + health.lstrip("/")
         healthy = False
         for _ in range(40):
-            hc, out, _ = _exec(cli, f"curl -fsS -o /dev/null -w '%{{http_code}}' {url} || true")
+            _, out, _ = _exec(cli, f"curl -fsS -o /dev/null -w '%{{http_code}}' {url} || true")
             if out.strip().startswith("2"):
                 healthy = True
                 break
@@ -159,14 +161,15 @@ def up_remote(context=DEFAULT_CONTEXT, container_port=twin_local.DEFAULT_PORT,
         raise
 
 
-def teardown_remote(cli, container, workdir=None, docker="docker"):
+def teardown_remote(cli, container: str, workdir: str | None = None,
+                    docker: str = "docker") -> None:
     _exec(cli, f"{docker} rm -f {container} >/dev/null 2>&1; "
                f"{docker} rmi -f {container} >/dev/null 2>&1; "
                + (f"rm -rf {workdir}" if workdir else ""))
 
 
-def up(context=DEFAULT_CONTEXT, container_port=twin_local.DEFAULT_PORT,
-       health=twin_local.DEFAULT_HEALTH):
+def up(context=DEFAULT_CONTEXT, container_port: int = twin_local.DEFAULT_PORT,
+       health: str = twin_local.DEFAULT_HEALTH) -> tuple[str, object]:
     """Try the server twin; on any trouble, run locally and say so.
     Returns (backend, handle) where backend is 'server' or 'local'."""
     try:
@@ -200,7 +203,7 @@ def _selftest(args):
         print(f"tore down {twin.id} on the box", file=sys.stderr)
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="NEO server twin (SSH + Docker)")
     p.add_argument("--context", default=str(DEFAULT_CONTEXT))
     p.add_argument("--health", default=twin_local.DEFAULT_HEALTH)

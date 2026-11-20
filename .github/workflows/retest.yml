@@ -1,15 +1,15 @@
 name: retest-gate
 
-# The merge gate. On a PR we rebuild the patched twin, replay every exploit
-# against it, and fail unless every objective now fails (decided server-side
-# from the twin's event log, never an agent's report) AND the tests pass. On
-# every push we re-run the suite so a fixed bug cannot silently come back.
+# The merge gate for a fix PR. We rebuild a fresh twin from the patched
+# demo-target, replay every exploit against it, and fail unless every objective
+# now fails, decided server-side from the twin's event log, never an agent's
+# report. demo-target/ is vulnerable on purpose on master, so the replay only
+# means something on a PR that changes it; every other PR is covered by ci.yml.
 
 on:
   pull_request:
     branches: [main, master, joao]
-  push:
-    branches: [main, master, joao]
+    paths: ["demo-target/**"]
 
 concurrency:
   group: retest-${{ github.ref }}
@@ -20,8 +20,7 @@ permissions:
 
 jobs:
   retest:
-    # the exploit must now fail on the patched twin, and tests must pass
-    if: github.event_name == 'pull_request'
+    # the exploit must now fail on the patched twin, decided server-side
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -31,20 +30,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-
       - name: Replay exploits on the patched twin (every objective must fail)
-        run: python -m infra.replay --phase post-patch | tee retest-events.jsonl
-
-      - name: Run tests
         run: |
-          pytest -q tests; rc=$?
-          # rc 5 = no tests collected yet (tests/ owned by another track); any
-          # other nonzero is a real failure and fails the gate.
-          [ "$rc" = 0 ] || [ "$rc" = 5 ]
+          set -o pipefail
+          python -m infra.replay --phase post-patch | tee retest-events.jsonl
 
       - name: Upload retest events
         if: always()
@@ -53,25 +42,3 @@ jobs:
           name: retest-events
           path: retest-events.jsonl
           if-no-files-found: ignore
-
-  regression:
-    # every push: a fixed bug cannot come back silently
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install pytest
-
-      - name: Regression tests
-        run: |
-          pytest -q tests; rc=$?
-          [ "$rc" = 0 ] || [ "$rc" = 5 ]

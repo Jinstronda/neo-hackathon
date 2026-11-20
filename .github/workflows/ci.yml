@@ -1,0 +1,75 @@
+name: ci
+
+# Lint, the regression suite and the scenario harness on every push and PR,
+# and again every night so a fixed bug cannot come back silently even when
+# nobody pushes. The suite assumes demo-target/ is the unpatched baseline, so a
+# PR that only changes demo-target/ skips this workflow; retest.yml gates it.
+
+on:
+  push:
+    branches: [main, master, joao]
+  pull_request:
+    branches: [main, master, joao]
+    paths-ignore: ["demo-target/**"]
+  schedule:
+    - cron: "17 3 * * *"   # nightly replay, 03:17 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff==0.17.6
+
+      - name: Ruff
+        run: ruff check .
+
+  test:
+    # every proven exploit stays a test: it lands on the baseline, dies on the fix
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Regression and attack-replay tests
+        run: pytest -q tests
+
+  harness:
+    # every scenario end to end, judged by the server-side check, no LLM calls
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scenario harness (mock agent)
+        run: python -m neo.harness.runner run --all --agent mock

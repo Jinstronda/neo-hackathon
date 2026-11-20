@@ -11,9 +11,11 @@ is dead (server-side flag check), tests pass and both reviewers approve."""
 import datetime
 import hashlib
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from .. import reviewers
+from ..journal import Journal
 from . import github
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,7 +48,9 @@ def _evidence_body(finding, digest):
     ])
 
 
-def open_pr(finding, patch, *, journal=None, repo=None, workdir=None, base="main", store=STORE):
+def open_pr(finding: dict, patch: str, *, journal: Journal | None = None, repo: str | None = None,
+            workdir: str | Path | None = None, base: str = "main",
+            store: str | Path = STORE) -> dict:
     """Open a PR for a patch. With repo+workdir it is a real GitHub PR; otherwise a
     local PR record under runs/prs (demo and offline runs)."""
     fid = finding.get("finding_id", "finding")
@@ -74,13 +78,15 @@ def open_pr(finding, patch, *, journal=None, repo=None, workdir=None, base="main
     return pr
 
 
-def review(pr, *, guidelines="", journal=None, ask=None):
+def review(pr: dict, *, guidelines: str = "", journal: Journal | None = None,
+           ask: Callable | None = None) -> dict:
     """Both reviewers, each with its own recheck. {verdicts, passed, disagreement}."""
     kw = {"ask": ask} if ask else {}
     return reviewers.review_pr(pr, guidelines=guidelines, journal=journal, **kw)
 
 
-def blockers(pr, retest_green, tests_pass, verdicts):
+def blockers(pr: dict, retest_green: bool | None, tests_pass: bool | None,
+             verdicts: list[dict] | None) -> list[str]:
     """Every reason the PR may not merge. Empty list means ready."""
     out = []
     if retest_green is not True:
@@ -101,12 +107,15 @@ def blockers(pr, retest_green, tests_pass, verdicts):
     return out
 
 
-def ready_to_merge(pr, retest_green, tests_pass, verdicts):
+def ready_to_merge(pr: dict, retest_green: bool | None, tests_pass: bool | None,
+                   verdicts: list[dict] | None) -> bool:
+    """True only when blockers() finds nothing."""
     return not blockers(pr, retest_green, tests_pass, verdicts)
 
 
-def release(pr, merge_signal, *, retest_green, tests_pass, verdicts, journal=None,
-            regressions=REGRESSIONS):
+def release(pr: dict, merge_signal: dict | None, *, retest_green: bool | None,
+            tests_pass: bool | None, verdicts: list[dict], journal: Journal | None = None,
+            regressions: str | Path = REGRESSIONS) -> dict:
     """Run after a human merges. Re-checks the gate, then records the fixed bug as a
     permanent regression test plus attack replay that CI runs on every push."""
     if (merge_signal or {}).get("by") != "human":
@@ -141,7 +150,6 @@ def release(pr, merge_signal, *, retest_green, tests_pass, verdicts, journal=Non
 
 def demo():
     import tempfile
-    from ..journal import Journal
 
     tmp = Path(tempfile.mkdtemp())
     j = Journal(tmp / "run")

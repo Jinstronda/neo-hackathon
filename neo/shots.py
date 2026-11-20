@@ -35,7 +35,8 @@ def _ab(*args, timeout=150):
                           timeout=timeout)
 
 
-def panel(name, title, lines):
+def panel(name: str, title: str, lines: list[str]) -> Path | None:
+    """Render lines (trusted HTML; escape event data with esc) as a PNG panel."""
     PANELS.mkdir(parents=True, exist_ok=True)
     doc = (f"<!doctype html><meta charset=utf-8><style>{_CSS}</style>"
            f'<div id="panel"><h1>{html.escape(title)}</h1>{_render(lines)}</div>')
@@ -44,7 +45,8 @@ def panel(name, title, lines):
     return shot("file://" + str(p), name, selector="#panel")
 
 
-def shot(url, name, *, selector=None):
+def shot(url: str, name: str, *, selector: str | None = None) -> Path | None:
+    """Screenshot url (or one element of it) into screenshots/<name>.png; None on a miss."""
     out = SHOTS / f"{name}.png"
     try:
         _ab("open", url)
@@ -52,13 +54,11 @@ def shot(url, name, *, selector=None):
         if selector:
             args.append(selector)
         args.append(str(out))
-        r = _ab(*args)
-        if out.exists() and out.stat().st_size > 0:
-            return out
-        return None if r.returncode == 0 else None
+        _ab(*args)
+        return out if out.exists() and out.stat().st_size > 0 else None
     except (subprocess.SubprocessError, OSError):
         return None
 
 
-def esc(x):
+def esc(x) -> str:
     return html.escape(str(x))

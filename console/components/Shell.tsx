@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import type { ReactNode } from 'react';
 import { useRun } from './RunProvider';
 
-const tabs = [['/', 'Overview'], ['/incident', 'Incident'], ['/radar', 'Radar'], ['/numbers', 'Numbers']] as const;
+const tabs = [['/', 'Overview'], ['/demo', 'Demo'], ['/incident', 'Incident'], ['/radar', 'Radar'], ['/numbers', 'Numbers']] as const;
 const sha = process.env.NEXT_PUBLIC_COMMIT_SHA?.slice(0, 7);
 
 export function Shell({ children }: { children: ReactNode }) {
