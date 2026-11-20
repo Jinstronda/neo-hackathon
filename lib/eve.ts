@@ -9,7 +9,10 @@ type Fact = { type: string; scope?: { turnId?: string }; data?: Record<string, u
 type Line = { facts?: Fact[]; progress?: { type: string; scope?: { turnId?: string }; data?: Record<string, unknown> } };
 export type TurnEvent = { kind: 'text'; delta: string } | { kind: 'tool'; name: string } | { kind: 'tool-done'; name: string; ok: boolean } | { kind: 'end'; outcome: string };
 
-export async function send(sessionId: string | undefined, message: string): Promise<{ sessionId: string; deliveryId: string }> {
+const validId = (id?: string) => id && /^wrun_[A-Za-z0-9]+$/.test(id) ? id : undefined;
+
+export async function send(rawId: string | undefined, message: string): Promise<{ sessionId: string; deliveryId: string }> {
+  const sessionId = validId(rawId);
   const url = sessionId ? `${EVE_URL}/eve/v1/session/${sessionId}` : `${EVE_URL}/eve/v1/session`;
   const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...auth() }, body: JSON.stringify({ message }), signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw new Error(`eve answered ${response.status}`);
@@ -18,7 +21,9 @@ export async function send(sessionId: string | undefined, message: string): Prom
 }
 
 // Follows one delivery's turn on the session stream and yields only that turn's text and tool calls.
-export async function* turn(sessionId: string, deliveryId: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+export async function* turn(rawId: string, deliveryId: string, signal: AbortSignal): AsyncGenerator<TurnEvent> {
+  const sessionId = validId(rawId);
+  if (!sessionId) throw new Error('bad session id');
   const response = await fetch(`${EVE_URL}/eve/v1/session/${sessionId}/stream`, { headers: auth(), signal });
   if (!response.ok || !response.body) throw new Error(`eve stream ${response.status}`);
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
