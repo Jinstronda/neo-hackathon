@@ -1,12 +1,21 @@
 import { loadRun } from '@/lib/engine';
-import { phaseOf, type Phase, type RunEvent } from '@/lib/types';
+import { type Phase, type RunEvent } from '@/lib/types';
 import { operator } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 // a phase is over once its last event lands; a live cloud run gets there after the harness finishes
-const terminal: Record<Phase, string[]> = { red: ['flag_check', 'harness_error'], blue: ['metrics'], merge: ['merge'] };
+const terminal: Record<Phase, string[]> = { red: ['flag_check', 'harness_error'], blue: ['metrics'], merge: ['merge', 'merge_ready'] };
+// red is everything before the patch, merge is the human gate, blue is the rest (works for live and recorded runs)
+function phaseEvents(events: RunEvent[], phase: Phase): RunEvent[] {
+  const merge = (e: RunEvent) => e.type === 'merge' || e.type === 'merge_ready';
+  const cut = events.findIndex((e) => e.type === 'blue_patch');
+  const red = cut < 0 ? events.filter((e) => !merge(e)) : events.slice(0, cut);
+  if (phase === 'red') return red;
+  if (phase === 'merge') return events.filter(merge);
+  return cut < 0 ? [] : events.slice(cut).filter((e) => !merge(e));
+}
 const key = (e: RunEvent) => `${e.type}:${e.ts}`;
 
 // Streams one phase as Server-Sent Events. Polls the engine so live events arrive as they land;
@@ -24,15 +33,18 @@ export async function GET(request: Request) {
       while (!done && Date.now() < deadline && !request.signal.aborted) {
         const { events, source } = await loadRun(live);
         if (!sent.size) controller.enqueue(encoder.encode(`event: source\ndata: ${JSON.stringify({ source })}\n\n`));
-        for (const event of events.filter((e) => phaseOf(e) === phase || (phase === 'red' && e.type === 'harness_error'))) {
+        const mine = phaseEvents([...events].sort((a, b) => a.ts - b.ts), phase);
+        for (const event of mine) {
           if (sent.has(key(event))) continue;
           const gap = last ? event.ts - last.ts : 0;
           await new Promise((resolve) => setTimeout(resolve, last ? Math.min(2400, Math.max(500, gap * 40)) : 300));
           if (request.signal.aborted) return;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
           sent.add(key(event)); last = event;
-          if (terminal[phase].includes(event.type)) done = true;
+          if (source === 'engine' && terminal[phase].includes(event.type)) done = true;
         }
+        // a recorded run is complete: the phase ends once its last event is out
+        if (source !== 'engine' && mine.every((e) => sent.has(key(e)))) done = true;
         if (!done) await new Promise((resolve) => setTimeout(resolve, 2000));
       }
       controller.enqueue(encoder.encode('event: done\ndata: {}\n\n'));
