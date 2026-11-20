@@ -8,12 +8,12 @@ interface RunContext { chat: Chat; run: Run | null; seen: RunEvent[]; view: View
 const Ctx = createContext<RunContext | null>(null);
 
 // Holds the events seen so far. A phase streams from /api/stream (SSE); screens derive from `seen` only.
-export function RunProvider({ children }: { children: ReactNode }) {
-  const [run, setRun] = useState<Run | null>(null);
+export function RunProvider({ children, initial }: { children: ReactNode; initial: Run | null }) {
+  const [run, setRun] = useState<Run | null>(initial);
   const [seen, setSeen] = useState<RunEvent[]>([]);
   const [playing, setPlaying] = useState<Phase | null>(null);
   const source = useRef<EventSource | null>(null);
-  useEffect(() => { fetch('/api/run').then((r) => r.json()).then(setRun).catch(() => setRun(null)); }, []);
+  useEffect(() => { if (!initial) fetch('/api/run').then((r) => r.json()).then(setRun).catch(() => setRun(null)); }, [initial]);
   const play = useCallback((phase: Phase) => {
     source.current?.close();
     if (phase === 'red') setSeen([]);
