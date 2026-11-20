@@ -22,7 +22,7 @@ export function RunProvider({ children, initial, operator }: { children: ReactNo
     source.current = es;
     es.onmessage = (message) => {
       const event = JSON.parse(message.data) as RunEvent;
-      setSeen((old) => old.some((e) => e.ts === event.ts && e.type === event.type) ? old : [...old, event]);
+      setSeen((old) => old.some((e) => JSON.stringify(e) === message.data) ? old : [...old, event]);
     };
     es.addEventListener('done', () => { es.close(); setPlaying(null); });
     es.onerror = () => { es.close(); setPlaying(null); };
