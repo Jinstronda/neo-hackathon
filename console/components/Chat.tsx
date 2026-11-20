@@ -13,7 +13,7 @@ export function Chat() {
   const busy = status === 'submitted' || status === 'streaming';
   return (
     <section className="card chat" aria-label="Chat with NEO">
-      <div className="card-h">NEO<span className="end">{busy ? <span className="shimmer-text">Thinking</span> : 'Eve agent'}</span></div>
+      <div className="card-h">NEO<span className="end">{busy ? <span className="shimmer-text">Thinking</span> : ''}</span></div>
       <div className="msgs" tabIndex={0} aria-label="Conversation">
         <AnimatePresence initial={false}>
           {messages.map((m) => (
