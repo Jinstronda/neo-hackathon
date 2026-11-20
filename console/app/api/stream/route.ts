@@ -16,7 +16,8 @@ function phaseEvents(events: RunEvent[], phase: Phase): RunEvent[] {
   if (phase === 'merge') return events.filter(merge);
   return cut < 0 ? [] : events.slice(cut).filter((e) => !merge(e));
 }
-const key = (e: RunEvent) => `${e.type}:${e.ts}`;
+// events of one batch can share a timestamp (three retests at once), so the whole event is the key
+const key = (e: RunEvent) => JSON.stringify(e);
 
 // Streams one phase as Server-Sent Events. Polls the engine so live events arrive as they land;
 // real gaps between events are kept in order and compressed to 0.5-2.4 s for the stage.

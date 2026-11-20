@@ -74,8 +74,8 @@ export function EventLog() {
       <div className="card-h">Event stream<span className="end num">{seen.length || ''}</span></div>
       {seen.length ? (
         <div className="log" role="log" aria-live="polite" ref={log}>
-          {seen.map((e) => (
-            <motion.div key={`${e.type}-${e.ts}`} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}>
+          {seen.map((e, i) => (
+            <motion.div key={i} initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }}>
               <span className="t num">{clock(e.ts)}</span>
               <span className={e.type === 'retest' ? 'green' : e.type === 'flag_check' || e.type === 'red_finding' ? 'red' : 'soft'}>{e.type}</span>
               <span>{describe(e)}</span>
