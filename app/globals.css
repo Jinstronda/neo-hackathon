@@ -105,7 +105,7 @@ button, input, textarea { font: inherit; color: inherit; }
 /* incident */
 .twins { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .twin { padding: 16px; display: grid; gap: 12px; align-content: start; min-height: 220px; transition: background var(--slow) var(--ease); }
-.twin.red { background: var(--red-bg); } .twin.green { background: var(--green-bg); }
+.twin.tint-red { background: var(--red-bg); } .twin.tint-green { background: var(--green-bg); }
 .verdict { font-size: var(--t-20); font-weight: 600; letter-spacing: -.01em; }
 .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; font-size: var(--t-13); }
 .kv dt { color: var(--muted); } .kv dd { min-width: 0; overflow-wrap: anywhere; }

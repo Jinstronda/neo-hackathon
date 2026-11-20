@@ -5,9 +5,11 @@ import { clock, num, text } from '@/lib/types';
 
 // Daily matches of CISA KEV, EPSS and OSV against the demo app's SBOM, as the engine reports them.
 export function Radar() {
-  const { run } = useRun();
+  const { run, seen } = useRun();
   if (!run) return <div className="card" style={{ padding: 16 }}><div className="skel" /></div>;
-  const matches = run.events.filter((e) => e.type === 'radar_match');
+  // a live run brings its own radar pass; before one, the bundled run's matches show
+  const live = seen.filter((e) => e.type === 'radar_match');
+  const matches = live.length ? live : run.events.filter((e) => e.type === 'radar_match');
   return (
     <section className="card">
       {matches.length ? (
@@ -17,8 +19,8 @@ export function Radar() {
             <motion.tr key={text(m.cve)} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
               <td className="mono">{text(m.cve)}</td>
               <td><span className="mono">{text(m.package)}</span> <span className="muted">{text(m.version)}</span></td>
-              <td className={m.kev === true || m.kev === 'True' ? 'red' : 'muted'}>{m.kev === true || m.kev === 'True' ? 'Exploited' : 'No'}</td>
-              <td className={`num ${num(m.epss) >= 0.5 ? 'red' : ''}`}>{(num(m.epss) * 100).toFixed(0)}%</td>
+              <td className={m.kev === true || m.kev === 'True' ? 'red' : 'muted'}>{m.kev === true || m.kev === 'True' ? (m.kev_staged ? 'Listed, staged' : 'Listed') : 'No'}</td>
+              <td className={`num ${num(m.epss) >= 0.5 ? 'red' : ''}`}>{(num(m.epss) * 100).toFixed(1)}%</td>
               <td className="mono hide-sm">{text(m.osv)}</td>
               <td className={m.reachable === true || m.reachable === 'True' ? 'amber' : 'muted'}>{m.reachable === true || m.reachable === 'True' ? 'Yes' : 'No'}</td>
               <td className="num muted hide-sm">{clock(m.ts)}</td>

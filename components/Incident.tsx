@@ -13,7 +13,7 @@ function Twin({ title, twin, check, request }: { title: string; twin?: RunEvent;
   const reached = objectiveReached(check);
   const tone = !check ? '' : reached ? 'red' : 'green';
   return (
-    <section className={`card twin ${tone}`} aria-label={title}>
+    <section className={`card twin${tone ? ` tint-${tone}` : ""}`} aria-label={title}>
       <div className="agent-h"><b>{title}</b><span className="role mono">{twin ? text(twin.twin_id) : ''}</span></div>
       <AnimatePresence mode="wait">
         {check ? (
@@ -46,7 +46,7 @@ export function Incident() {
       </div>
       <div className="split-3">
         <section className="card" aria-label="Patch">
-          <div className="card-h">{view.patch ? `PR #${text(view.patch.pr_number)}` : 'Patch'}<span className="end mono">{view.patch ? text(view.patch.branch) : ''}</span></div>
+          <div className="card-h">{view.patch?.pr_number ? `PR #${text(view.patch.pr_number)}` : 'Patch'}<span className="end mono">{view.patch ? text(view.patch.branch) : ''}</span></div>
           {view.patch ? (
             <div style={{ padding: 16, display: 'grid', gap: 12 }}>
               {(view.patch.commits as { msg: string }[] | undefined)?.map((c) => <span key={c.msg} className="mono">{c.msg}</span>)}
@@ -57,7 +57,7 @@ export function Incident() {
                   <dd><span className={r.verdict === 'approve' ? 'green' : 'red'}>{r.verdict === 'approve' ? 'Approved' : 'Changes requested'}</span> <span className="soft">{text(r.comment)}</span></dd>
                 </motion.div>
               ))}
-              {view.merge && <span className="green">Merged by a human at {clock(view.merge.ts)}</span>}
+              {view.merge && <span className="green">Approved by a human at {clock(view.merge.ts)}</span>}
             </div>
           ) : <div className="empty"><strong>No patch yet</strong>Tell NEO to fix it</div>}
         </section>

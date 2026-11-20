@@ -6,6 +6,8 @@ import type { Run } from './types';
 // The NEO engine (neo-hackathon) owns runs. ENGINE_URL points at its API; without it the console
 // reads the newest bundled run: a recorded engine run when one is checked in, the fixture otherwise.
 const ENGINE_URL = process.env.ENGINE_URL?.replace(/\/$/, '');
+const auth = (): Record<string, string> => process.env.NEO_EVE_SECRET
+  ? { authorization: `Basic ${Buffer.from(`neo:${process.env.NEO_EVE_SECRET}`).toString('base64')}` } : {};
 
 async function bundled(): Promise<Run> {
   for (const [file, source] of [['demo-run.json', 'recorded'], ['fixture.json', 'fixture']] as const) {
@@ -20,7 +22,7 @@ async function bundled(): Promise<Run> {
 export async function loadRun(): Promise<Run> {
   if (ENGINE_URL) {
     try {
-      const response = await fetch(`${ENGINE_URL}/api/run`, { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+      const response = await fetch(`${ENGINE_URL}/api/run`, { cache: 'no-store', headers: auth(), signal: AbortSignal.timeout(6000) });
       if (response.ok) { const data = await response.json(); return { run: data.run, events: data.events, source: data.source === 'fixture' ? 'fixture' : 'engine' }; }
     } catch { /* engine unreachable: fall back */ }
   }
@@ -32,7 +34,7 @@ export async function engineAction(action: 'attack' | 'fix' | 'approve'): Promis
   if (!ENGINE_URL) return { live: false, detail: 'replaying the recorded run' };
   try {
     const response = await fetch(`${ENGINE_URL}/api/run`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action }), signal: AbortSignal.timeout(15000),
+      method: 'POST', headers: { 'content-type': 'application/json', ...auth() }, body: JSON.stringify({ action }), signal: AbortSignal.timeout(15000),
     });
     return { live: response.ok, detail: response.ok ? 'engine accepted' : `engine answered ${response.status}` };
   } catch (error) {

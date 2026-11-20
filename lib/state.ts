@@ -37,7 +37,7 @@ export function view(run: RunSummary, events: RunEvent[]): View {
   const timeline = [
     row('landed', 'Exploit landed', first, findings[0] ? `${findings[0].cls} on ${findings[0].location}` : '', 'red'),
     row('diagnosed', 'Diagnosed', pre, pre ? `Server flag check: objective reached${findings[0]?.confirmedBy ? `, confirmed by ${findings[0].confirmedBy}` : ''}` : '', preWorks ? 'red' : 'plain'),
-    row('proposed', 'Patch proposed', patch, patch ? `PR #${text(patch.pr_number)} ${text(patch.branch)}` : ''),
+    row('proposed', 'Patch proposed', patch, patch ? `${patch.pr_number ? `PR #${text(patch.pr_number)} ` : ''}${text(patch.branch)}` : ''),
     row('rebuilt', 'Twin rebuilt', rebuilt, rebuilt ? `${text(rebuilt.twin_id)} from ${text(rebuilt.image)}` : ''),
     row('retest', 'Retest', post, post ? (postDead ? 'Same exploit, objective not reached' : 'Exploit still works') : '', post ? (postDead ? 'green' : 'red') : 'plain'),
     row('verified', 'Verified', tests && postDead ? tests : undefined, tests ? `${num(tests.passed)}/${num(tests.total)} tests, ${num(tests.regression_added)} regression added` : '', 'green'),
@@ -49,7 +49,7 @@ export function view(run: RunSummary, events: RunEvent[]): View {
       if (own) activity = `Found ${text(own.cls).toLowerCase()} at ${text(own.location)}`;
       else if (started) { activity = pre ? 'Swept, no new finding' : 'Attacking the twin'; busy = !pre; }
     } else if (agent.role === 'blue') {
-      if (patch) activity = `Opened PR #${text(patch.pr_number)}`;
+      if (patch) activity = patch.pr_number ? `Opened PR #${text(patch.pr_number)}` : `Patched ${text(patch.branch)}`;
       else if (pre) { activity = 'Writing the patch'; busy = true; }
     } else {
       const own = reviews.find((r) => r.reviewer === agent.label);

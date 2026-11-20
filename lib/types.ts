@@ -20,4 +20,5 @@ export function clock(ts: number): string {
 
 // red phase: what NEO does before anyone says "fix it"
 export const redTypes = ['radar_match', 'twin_create', 'red_start', 'red_finding', 'flag_check'];
-export const phaseOf = (event: RunEvent) => redTypes.includes(event.type) && event.phase !== 'post-patch' ? 'red' : 'blue';
+export type Phase = 'red' | 'blue' | 'merge';
+export const phaseOf = (event: RunEvent): Phase => event.type === 'merge' ? 'merge' : redTypes.includes(event.type) && event.phase !== 'post-patch' ? 'red' : 'blue';

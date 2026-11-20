@@ -1,9 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { view, type View } from '@/lib/state';
-import type { Run, RunEvent, Source } from '@/lib/types';
-
-type Phase = 'red' | 'blue';
+import type { Phase, Run, RunEvent, Source } from '@/lib/types';
 interface RunContext { run: Run | null; seen: RunEvent[]; view: View | null; source: Source | null; playing: Phase | null; play: (phase: Phase) => void; reset: () => void }
 const Ctx = createContext<RunContext | null>(null);
 
@@ -16,6 +14,7 @@ export function RunProvider({ children }: { children: ReactNode }) {
   useEffect(() => { fetch('/api/run').then((r) => r.json()).then(setRun).catch(() => setRun(null)); }, []);
   const play = useCallback((phase: Phase) => {
     source.current?.close();
+    if (phase === 'red') setSeen([]);
     setPlaying(phase);
     const es = new EventSource(`/api/stream?phase=${phase}`);
     source.current = es;

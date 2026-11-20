@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 import { useRun } from './RunProvider';
 
 const prompts = ['Attack our demo app', 'What did you find?', 'Fix it', 'Approved'];
-const toolLabel: Record<string, string> = { attack_demo_app: 'Started the red team', read_findings: 'Read the findings', fix_finding: 'Opened the patch PR', approve_merge: 'Merged the PR', run_status: 'Read the run' };
+const toolLabel: Record<string, string> = { attack_demo_app: 'Started the red team', read_findings: 'Read the findings', fix_finding: 'Patched and retested', approve_merge: 'Recorded the approval', run_status: 'Read the run' };
 
 export function Chat() {
   const { play } = useRun();
@@ -17,6 +17,7 @@ export function Chat() {
     for (const part of (data ?? []).slice(handled.current) as { action?: string }[]) {
       if (part?.action === 'attack') play('red');
       if (part?.action === 'fix') play('blue');
+      if (part?.action === 'approve') play('merge');
     }
     handled.current = data?.length ?? 0;
   }, [data, play]);
@@ -30,7 +31,7 @@ export function Chat() {
           {messages.map((m) => (
             <motion.div key={m.id} className={`msg ${m.role === 'user' ? 'user' : 'neo'}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }}>
               <span className="who">{m.role === 'user' ? 'You' : 'NEO'}</span>
-              {m.parts.map((p, i) => p.type === 'text' ? <span key={i} className="body">{p.text}</span>
+              {m.parts.map((p, i) => p.type === 'text' ? <span key={i} className="body">{p.text.replace(/`/g, '')}</span>
                 : p.type === 'tool-invocation' ? <span key={i} className="tool">{toolLabel[p.toolInvocation.toolName] ?? p.toolInvocation.toolName}</span> : null)}
             </motion.div>
           ))}

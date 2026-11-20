@@ -1,23 +1,37 @@
 import { loadRun } from '@/lib/engine';
-import { phaseOf } from '@/lib/types';
+import { phaseOf, type Phase, type RunEvent } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
-// Streams one phase of the run as Server-Sent Events. Real gaps between events are kept in order
-// and compressed to 0.5-2.4 s so the stage sees each step land.
+// a phase is over once its last event lands; a live cloud run gets there after the harness finishes
+const terminal: Record<Phase, string[]> = { red: ['flag_check', 'harness_error'], blue: ['metrics'], merge: ['merge'] };
+const key = (e: RunEvent) => `${e.type}:${e.ts}`;
+
+// Streams one phase as Server-Sent Events. Polls the engine so live events arrive as they land;
+// real gaps between events are kept in order and compressed to 0.5-2.4 s for the stage.
 export async function GET(request: Request) {
-  const phase = new URL(request.url).searchParams.get('phase') || 'all';
-  const { events, source } = await loadRun();
-  const chosen = events.filter((event) => phase === 'all' || phaseOf(event) === phase);
+  const asked = new URL(request.url).searchParams.get('phase');
+  const phase: Phase = asked === 'blue' || asked === 'merge' ? asked : 'red';
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      controller.enqueue(encoder.encode(`event: source\ndata: ${JSON.stringify({ source })}\n\n`));
-      for (let index = 0; index < chosen.length; index += 1) {
-        const gap = index ? chosen[index].ts - chosen[index - 1].ts : 0;
-        await new Promise((resolve) => setTimeout(resolve, index ? Math.min(2400, Math.max(500, gap * 40)) : 300));
-        if (request.signal.aborted) return;
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(chosen[index])}\n\n`));
+      const sent = new Set<string>();
+      let last: RunEvent | undefined, done = false;
+      const deadline = Date.now() + 280_000;
+      while (!done && Date.now() < deadline && !request.signal.aborted) {
+        const { events, source } = await loadRun();
+        if (!sent.size) controller.enqueue(encoder.encode(`event: source\ndata: ${JSON.stringify({ source })}\n\n`));
+        for (const event of events.filter((e) => phaseOf(e) === phase || (phase === 'red' && e.type === 'harness_error'))) {
+          if (sent.has(key(event))) continue;
+          const gap = last ? event.ts - last.ts : 0;
+          await new Promise((resolve) => setTimeout(resolve, last ? Math.min(2400, Math.max(500, gap * 40)) : 300));
+          if (request.signal.aborted) return;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          sent.add(key(event)); last = event;
+          if (terminal[phase].includes(event.type)) done = true;
+        }
+        if (!done) await new Promise((resolve) => setTimeout(resolve, 2000));
       }
       controller.enqueue(encoder.encode('event: done\ndata: {}\n\n'));
       controller.close();
