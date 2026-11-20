@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://homodeus.co/neo/run.schema.json",
+  "title": "NEO run contract",
+  "description": "The run.json summary plus the events.jsonl stream the console reads. Source of truth: neo/journal.py and docs/RUN_SCHEMA.md.",
+  "type": "object",
+  "required": ["run", "events"],
+  "properties": {
+    "source": { "enum": ["engine", "recorded", "fixture"] },
+    "run": {
+      "type": "object",
+      "required": ["id", "title", "date", "where", "agents", "steps", "metrics"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "date": { "const": "2026-11-20" },
+        "where": { "type": "string" },
+        "agents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "role", "label", "status"],
+            "properties": {
+              "id": { "type": "string" },
+              "role": { "enum": ["red", "blue", "reviewer"] },
+              "label": { "type": "string" },
+              "status": { "type": "string" },
+              "task": { "type": "string" }
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "object",
+            "required": ["key", "title", "live", "events"],
+            "properties": {
+              "key": { "enum": ["radar", "red", "blue", "review", "retest", "merge"] },
+              "title": { "type": "string" },
+              "live": { "type": "boolean" },
+              "events": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "required": ["minutes_exploit_to_fix", "cost_usd", "where", "tested_surface", "untested_surface", "regression_tests"],
+          "properties": {
+            "minutes_exploit_to_fix": { "type": "number", "minimum": 0 },
+            "cost_usd": { "type": "number", "minimum": 0 },
+            "where": { "type": "string" },
+            "tested_surface": { "type": "number" },
+            "untested_surface": { "type": "number" },
+            "regression_tests": { "type": "number" },
+            "lockin_before": { "type": "number" },
+            "lockin_after": { "type": "number" }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/event" }
+    }
+  },
+  "$defs": {
+    "event": {
+      "type": "object",
+      "required": ["type", "ts"],
+      "properties": { "type": { "type": "string" }, "ts": { "type": "number" } },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "radar_match" } } }, "then": { "required": ["cve", "kev", "epss", "osv", "package", "version", "reachable"] } },
+        { "if": { "properties": { "type": { "const": "twin_create" } } }, "then": { "required": ["twin_id", "where", "image"], "properties": { "where": { "enum": ["server", "local"] } } } },
+        { "if": { "properties": { "type": { "const": "red_start" } } }, "then": { "required": ["twin_id", "models"], "properties": { "models": { "type": "array", "minItems": 1 } } } },
+        { "if": { "properties": { "type": { "const": "red_finding" } } }, "then": { "required": ["finding_id", "model", "cls", "location", "request", "response", "confirmed_by"] } },
+        { "if": { "properties": { "type": { "const": "flag_check" } } }, "then": { "required": ["finding_id", "scenario", "phase", "objective_complete", "evidence"], "properties": { "phase": { "enum": ["pre-patch", "post-patch"] }, "objective_complete": { "type": "boolean" } } } },
+        { "if": { "properties": { "type": { "const": "blue_patch" } } }, "then": { "required": ["finding_id", "pr_url", "pr_number", "branch", "diff", "commits"] } },
+        { "if": { "properties": { "type": { "const": "review" } } }, "then": { "required": ["pr_number", "reviewer", "vendor", "verdict", "comment", "rechecked"], "properties": { "reviewer": { "enum": ["security", "correctness"] }, "verdict": { "enum": ["approve", "request_changes"] }, "rechecked": { "const": true } } } },
+        { "if": { "properties": { "type": { "const": "twin_deploy" } } }, "then": { "required": ["twin_id", "where", "image", "finding_id"] } },
+        { "if": { "properties": { "type": { "const": "retest" } } }, "then": { "required": ["finding_id", "scenario", "objective_complete", "status"], "properties": { "status": { "enum": ["green", "red"] } } } },
+        { "if": { "properties": { "type": { "const": "tests" } } }, "then": { "required": ["passed", "total", "regression_added"] } },
+        { "if": { "properties": { "type": { "const": "merge" } } }, "then": { "required": ["pr_number", "by", "approved_by"], "properties": { "by": { "const": "human" } } } },
+        { "if": { "properties": { "type": { "const": "metrics" } } }, "then": { "required": ["minutes_exploit_to_fix", "cost_usd", "where", "tested_surface", "untested_surface", "regression_tests"] } }
+      ]
+    }
+  }
+}

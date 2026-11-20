@@ -1,0 +1,19 @@
+{
+  "_note": "Staged KEV entry for the demo. CVE-2020-14343 (PyYAML arbitrary code execution) is real and still carries a high EPSS percentile, but it is NOT in the live CISA KEV feed, so the radar merges this fixture to guarantee an in-KEV match against the target's outdated PyYAML 5.3.1 pin on 2026-11-20. Shape mirrors one element of the CISA KEV catalog's vulnerabilities[].",
+  "catalogVersion": "2026.11.20-staged",
+  "vulnerabilities": [
+    {
+      "cveID": "CVE-2020-14343",
+      "vendorProject": "PyYAML",
+      "product": "PyYAML",
+      "vulnerabilityName": "PyYAML FullLoader Arbitrary Code Execution",
+      "dateAdded": "2026-11-20",
+      "shortDescription": "PyYAML before 5.4 allows arbitrary code execution when processing untrusted YAML through the FullLoader via the python/object/new constructor.",
+      "requiredAction": "Upgrade PyYAML to 6.0.1 or later.",
+      "dueDate": "2026-12-11",
+      "knownRansomwareCampaignUse": "Unknown",
+      "notes": "https://nvd.nist.gov/vuln/detail/CVE-2020-14343",
+      "cwes": ["CWE-20"]
+    }
+  ]
+}

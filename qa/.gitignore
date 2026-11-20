@@ -1,0 +1,4 @@
+node_modules/
+.venv/
+runs/*/trace.zip
+raw/*.tmp

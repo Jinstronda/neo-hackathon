@@ -1,0 +1,5 @@
+# SnapVault demo target config. Loaded at startup with PyYAML (see requirements.txt).
+app_name: SnapVault
+iam_role_name: neo-demo-role
+guest_username: guest
+guest_password: guest

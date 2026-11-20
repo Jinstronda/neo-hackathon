@@ -1,0 +1,77 @@
+name: retest-gate
+
+# The merge gate. On a PR we rebuild the patched twin, replay every exploit
+# against it, and fail unless every objective now fails (decided server-side
+# from the twin's event log, never an agent's report) AND the tests pass. On
+# every push we re-run the suite so a fixed bug cannot silently come back.
+
+on:
+  pull_request:
+    branches: [main, joao]
+  push:
+    branches: [main, joao]
+
+concurrency:
+  group: retest-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  retest:
+    # the exploit must now fail on the patched twin, and tests must pass
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Replay exploits on the patched twin (every objective must fail)
+        run: python -m infra.replay --phase post-patch | tee retest-events.jsonl
+
+      - name: Run tests
+        run: |
+          pytest -q tests; rc=$?
+          # rc 5 = no tests collected yet (tests/ owned by another track); any
+          # other nonzero is a real failure and fails the gate.
+          [ "$rc" = 0 ] || [ "$rc" = 5 ]
+
+      - name: Upload retest events
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retest-events
+          path: retest-events.jsonl
+          if-no-files-found: ignore
+
+  regression:
+    # every push: a fixed bug cannot come back silently
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Regression tests
+        run: |
+          pytest -q tests; rc=$?
+          [ "$rc" = 0 ] || [ "$rc" = 5 ]
