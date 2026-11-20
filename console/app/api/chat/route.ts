@@ -1,6 +1,9 @@
 import { createDataStreamResponse, formatDataStreamPart } from 'ai';
 import { cookies } from 'next/headers';
 import { send, turn } from '@/lib/eve';
+import { bundled } from '@/lib/engine';
+import { replayTurn } from '@/lib/replay';
+import { operator } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -14,6 +17,21 @@ export async function POST(request: Request) {
   const { messages = [] } = await request.json().catch(() => ({})) as Incoming;
   const message = [...messages].reverse().find((m) => m.role === 'user')?.content?.trim();
   if (!message) return Response.json({ error: 'empty message' }, { status: 400 });
+  if (!(await operator())) {
+    // replay for visitors: same stream protocol, NEO's lines derived from the recorded run
+    const { events } = await bundled();
+    const step = replayTurn(message, events);
+    return createDataStreamResponse({
+      async execute(writer) {
+        if (step.action) writer.writeData({ action: step.action });
+        writer.write(formatDataStreamPart('tool_call', { toolCallId: `${step.tool}-${Date.now()}`, toolName: step.tool, args: {} }));
+        for (const word of step.reply.split(/(?<= )/)) {
+          writer.write(formatDataStreamPart('text', word));
+          await new Promise((resolve) => setTimeout(resolve, 28));
+        }
+      },
+    });
+  }
   const jar = await cookies();
   const fresh = messages.filter((m) => m.role === 'user').length === 1;
   let session: { sessionId: string; deliveryId: string };

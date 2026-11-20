@@ -9,7 +9,7 @@ const ENGINE_URL = process.env.ENGINE_URL?.replace(/\/$/, '');
 const auth = (): Record<string, string> => process.env.NEO_EVE_SECRET
   ? { authorization: `Basic ${Buffer.from(`neo:${process.env.NEO_EVE_SECRET}`).toString('base64')}` } : {};
 
-async function bundled(): Promise<Run> {
+export async function bundled(): Promise<Run> {
   for (const [file, source] of [['demo-run.json', 'recorded'], ['fixture.json', 'fixture']] as const) {
     try {
       const data = JSON.parse(await readFile(path.join(process.cwd(), 'public', 'runs', file), 'utf8'));
@@ -19,8 +19,9 @@ async function bundled(): Promise<Run> {
   throw new Error('no run available');
 }
 
-export async function loadRun(): Promise<Run> {
-  if (ENGINE_URL) {
+// live engine only for a signed-in operator; everyone else gets the recorded run (replay)
+export async function loadRun(live = false): Promise<Run> {
+  if (live && ENGINE_URL) {
     try {
       const response = await fetch(`${ENGINE_URL}/api/run`, { cache: 'no-store', headers: auth(), signal: AbortSignal.timeout(6000) });
       if (response.ok) { const data = await response.json(); return { run: data.run, events: data.events, source: data.source === 'fixture' ? 'fixture' : 'engine' }; }
