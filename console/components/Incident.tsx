@@ -54,10 +54,10 @@ export function Incident() {
               {(view.patch.commits as { msg: string }[] | undefined)?.map((c) => <span key={c.msg} className="mono">{c.msg}</span>)}
               <Diff diff={text(view.patch.diff)} />
               {view.reviews.map((r) => (
-                <motion.div key={text(r.reviewer)} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="kv">
+                <motion.dl key={text(r.reviewer)} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="kv">
                   <dt className="soft">{text(r.reviewer)}</dt>
                   <dd><span className={r.verdict === 'approve' ? 'green' : 'red'}>{r.verdict === 'approve' ? 'Approved' : 'Changes requested'}</span> <span className="soft">{text(r.comment)}</span></dd>
-                </motion.div>
+                </motion.dl>
               ))}
               {view.merge && <span className="green">Approved by a human at {clock(view.merge.ts)}</span>}
             </div>

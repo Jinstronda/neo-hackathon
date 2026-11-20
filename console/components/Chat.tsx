@@ -14,7 +14,7 @@ export function Chat() {
   return (
     <section className="card chat" aria-label="Chat with NEO">
       <div className="card-h">NEO<span className="end">{busy ? <span className="shimmer-text">Thinking</span> : 'Eve agent'}</span></div>
-      <div className="msgs">
+      <div className="msgs" tabIndex={0} aria-label="Conversation">
         <AnimatePresence initial={false}>
           {messages.map((m) => (
             <motion.div key={m.id} className={`msg ${m.role === 'user' ? 'user' : 'neo'}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24 }}>
